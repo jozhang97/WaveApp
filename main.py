@@ -1,4 +1,3 @@
-# TODO Is our data at the right spot and ready??
 from __future__ import division
 
 import os, sys, pdb, shutil, time, random
