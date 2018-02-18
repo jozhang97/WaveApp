@@ -1,10 +1,12 @@
+# TODO Is our data at the right spot and ready??
 from __future__ import division
 
 import os, sys, pdb, shutil, time, random
 import argparse
 import torch
+import torchaudio
 import torch.backends.cudnn as cudnn
-import torchvision.datasets as dset
+import torchaudio.datasets as dset
 import torchvision.transforms as transforms
 from utils import AverageMeter, RecorderMeter, time_string, convert_secs2time
 import models
@@ -15,7 +17,7 @@ model_names = sorted(name for name in models.__dict__
 
 parser = argparse.ArgumentParser(description='Trains AlexNet on CMU Arctic', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('data_path', type=str, help='Path to dataset')
-parser.add_argument('--dataset', type=str, choices=['arctic'])
+parser.add_argument('--dataset', type=str, choices=['arctic', 'vctk'])
 parser.add_argument('--arch', metavar='ARCH', default='alexnet', choices=model_names, help='model architecture: ' + ' | '.join(model_names) + ' (default: alexnet)')
 # Optimization options
 parser.add_argument('--epochs', type=int, default=300, help='Number of epochs to train.')
@@ -61,28 +63,23 @@ def main():
   print_log("cudnn  version : {}".format(torch.backends.cudnn.version()), log)
 
   # Data loading code
+  # Any other preprocessings? http://pytorch.org/audio/transforms.html
+  sample_length = 40000
+  scale = torchaudio.transforms.Scale(),
+  padtrim = torchaudio.transforms.PadTrim(sample_length),
+  downmix = torchaudio.transforms.DownmixMono()
+  transforms_audio = torchaudio.transforms.Compose([
+    scale, padtrim, downmix, transforms.ToTensor()
+  ])
+
+
+
   if not os.path.isdir(args.data_path):
     os.makedirs(args.data_path)
-
   traindir = os.path.join(args.data_path, 'train')
   valdir = os.path.join(args.data_path, 'val')
-  normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                   std=[0.229, 0.224, 0.225])
-  # TODO What transforms to do for audio?
-  train_dataset = dset.ImageFolder(
-    traindir,
-    transforms.Compose([
-      transforms.RandomSizedCrop(224),
-      transforms.RandomHorizontalFlip(),
-      transforms.ToTensor(),
-      normalize,
-    ]))
-  val_dataset = dset.ImageFolder(valdir, transforms.Compose([
-      transforms.Scale(256),
-      transforms.CenterCrop(224),
-      transforms.ToTensor(),
-      normalize,
-    ])),
+  train_dataset = dset.ImageFolder(traindir, transforms_audio)
+  val_dataset = dset.ImageFolder(valdir, transforms_audio)
   train_loader = torch.utils.data.DataLoader(
     train_dataset,
     batch_size=args.batch_size, shuffle=True,
@@ -92,8 +89,15 @@ def main():
     batch_size=args.batch_size, shuffle=False,
     num_workers=args.workers, pin_memory=True)
 
+
   if args.dataset == "arctic":
-    num_classes = 5  # TODO is this right?
+    num_classes = 2
+  elif args.dataset == 'vctk':
+    train_data = dset.CIFAR10(args.data_path, train=True, transform=transforms_audio, download=True)
+    test_data = dset.CIFAR10(args.data_path, train=False, transform=transforms_audio, download=True)
+    num_classes = 10
+
+
 
   print_log("=> creating model '{}'".format(args.arch), log)
   # Init model, criterion, and optimizer
