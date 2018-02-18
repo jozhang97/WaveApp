@@ -60,50 +60,40 @@ def main():
   print_log("torch  version : {}".format(torch.__version__), log)
   print_log("cudnn  version : {}".format(torch.backends.cudnn.version()), log)
 
-  # Init dataset
+  # Data loading code
   if not os.path.isdir(args.data_path):
     os.makedirs(args.data_path)
 
-  if args.dataset == 'cifar10':
-    mean = [x / 255 for x in [125.3, 123.0, 113.9]]
-    std = [x / 255 for x in [63.0, 62.1, 66.7]]
-  elif args.dataset == 'cifar100':
-    mean = [x / 255 for x in [129.3, 124.1, 112.4]]
-    std = [x / 255 for x in [68.2, 65.4, 70.4]]
-  else:
-    assert False, "Unknow dataset : {}".format(args.dataset)
+  traindir = os.path.join(args.data_path, 'train')
+  valdir = os.path.join(args.data_path, 'val')
+  normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                   std=[0.229, 0.224, 0.225])
+  # TODO What transforms to do for audio?
+  train_dataset = dset.ImageFolder(
+    traindir,
+    transforms.Compose([
+      transforms.RandomSizedCrop(224),
+      transforms.RandomHorizontalFlip(),
+      transforms.ToTensor(),
+      normalize,
+    ]))
+  val_dataset = dset.ImageFolder(valdir, transforms.Compose([
+      transforms.Scale(256),
+      transforms.CenterCrop(224),
+      transforms.ToTensor(),
+      normalize,
+    ])),
+  train_loader = torch.utils.data.DataLoader(
+    train_dataset,
+    batch_size=args.batch_size, shuffle=True,
+    num_workers=args.workers, pin_memory=True, sampler=None)
+  val_loader = torch.utils.data.DataLoader(
+    val_dataset,
+    batch_size=args.batch_size, shuffle=False,
+    num_workers=args.workers, pin_memory=True)
 
-  train_transform = transforms.Compose(
-    [transforms.RandomHorizontalFlip(), transforms.RandomCrop(32, padding=4), transforms.ToTensor(),
-     transforms.Normalize(mean, std)])
-  test_transform = transforms.Compose(
-    [transforms.ToTensor(), transforms.Normalize(mean, std)])
-
-  if args.dataset == 'cifar10':
-    train_data = dset.CIFAR10(args.data_path, train=True, transform=train_transform, download=True)
-    test_data = dset.CIFAR10(args.data_path, train=False, transform=test_transform, download=True)
-    num_classes = 10
-  elif args.dataset == 'cifar100':
-    train_data = dset.CIFAR100(args.data_path, train=True, transform=train_transform, download=True)
-    test_data = dset.CIFAR100(args.data_path, train=False, transform=test_transform, download=True)
-    num_classes = 100
-  elif args.dataset == 'svhn':
-    train_data = dset.SVHN(args.data_path, split='train', transform=train_transform, download=True)
-    test_data = dset.SVHN(args.data_path, split='test', transform=test_transform, download=True)
-    num_classes = 10
-  elif args.dataset == 'stl10':
-    train_data = dset.STL10(args.data_path, split='train', transform=train_transform, download=True)
-    test_data = dset.STL10(args.data_path, split='test', transform=test_transform, download=True)
-    num_classes = 10
-  elif args.dataset == 'imagenet':
-    assert False, 'Do not finish imagenet code'
-  else:
-    assert False, 'Do not support dataset : {}'.format(args.dataset)
-
-  train_loader = torch.utils.data.DataLoader(train_data, batch_size=args.batch_size, shuffle=True,
-                         num_workers=args.workers, pin_memory=True)
-  test_loader = torch.utils.data.DataLoader(test_data, batch_size=args.batch_size, shuffle=False,
-                        num_workers=args.workers, pin_memory=True)
+  if args.dataset == "arctic":
+    num_classes = 5  # TODO is this right?
 
   print_log("=> creating model '{}'".format(args.arch), log)
   # Init model, criterion, and optimizer
@@ -139,7 +129,7 @@ def main():
     print_log("=> do not use any checkpoint for {} model".format(args.arch), log)
 
   if args.evaluate:
-    validate(test_loader, net, criterion, log)
+    validate(val_loader, net, criterion, log)
     return
 
   # Main loop
@@ -159,7 +149,7 @@ def main():
 
     # evaluate on validation set
     #val_acc,   val_los   = extract_features(test_loader, net, criterion, log)
-    val_acc,   val_los   = validate(test_loader, net, criterion, log)
+    val_acc,   val_los   = validate(val_loader, net, criterion, log)
     is_best = recorder.update(epoch, train_los, train_acc, val_los, val_acc)
 
     save_checkpoint({

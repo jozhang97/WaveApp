@@ -1,4 +1,5 @@
 # Consider using just SummaryWriter at tensorboardX if don't want to tf download
+# TODO Need to use this
 # Code referenced from https://gist.github.com/gyglim/1f8dfb1b5c82627ae3efcfbbadb9f514
 import tensorflow as tf
 import numpy as np
