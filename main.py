@@ -3,10 +3,9 @@ from __future__ import division
 import os, sys, pdb, shutil, time, random
 import argparse
 import torch
-import torchaudio
 import torch.backends.cudnn as cudnn
 import torchaudio.datasets as dset
-import torchvision.transforms as transforms
+import torchaudio.transforms as transforms
 from utils import AverageMeter, RecorderMeter, time_string, convert_secs2time
 import models
 
@@ -64,10 +63,10 @@ def main():
   # Data loading code
   # Any other preprocessings? http://pytorch.org/audio/transforms.html
   sample_length = 40000
-  scale = torchaudio.transforms.Scale(),
-  padtrim = torchaudio.transforms.PadTrim(sample_length),
-  downmix = torchaudio.transforms.DownmixMono()
-  transforms_audio = torchaudio.transforms.Compose([
+  scale = transforms.Scale(),
+  padtrim = transforms.PadTrim(sample_length),
+  downmix = transforms.DownmixMono()
+  transforms_audio = transforms.Compose([
     scale, padtrim, downmix, transforms.ToTensor()
   ])
 
