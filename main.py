@@ -12,6 +12,8 @@ import models
 model_names = sorted(name for name in models.__dict__
   if name.islower() and not name.startswith("__")
   and callable(models.__dict__[name]))
+# TODO Fix ^
+model_names = ['alexnet']
 
 parser = argparse.ArgumentParser(description='Trains AlexNet on CMU Arctic', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('data_path', type=str, help='Path to dataset')
@@ -67,7 +69,7 @@ def main():
   padtrim = transforms.PadTrim(sample_length),
   downmix = transforms.DownmixMono()
   transforms_audio = transforms.Compose([
-    scale, padtrim, downmix, transforms.ToTensor()
+    scale, padtrim, downmix
   ])
 
   if not os.path.isdir(args.data_path):
@@ -81,8 +83,8 @@ def main():
     val_dataset = dset.ImageFolder(val_dir, transforms_audio)
     num_classes = 2
   elif args.dataset == 'vctk':
-    train_dataset = dset.VCTK(train_dir, train=True, transform=transforms_audio, download=True)
-    val_dataset = dset.VCTK(val_dir, train=False, transform=transforms_audio, download=True)
+    train_dataset = dset.VCTK(train_dir, transform=transforms_audio, download=True)
+    val_dataset = dset.VCTK(val_dir, transform=transforms_audio, download=True)
     num_classes = 10
   else:
     assert False, "Dataset is incorrect"
