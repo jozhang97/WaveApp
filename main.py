@@ -72,14 +72,23 @@ def main():
     scale, padtrim, downmix, transforms.ToTensor()
   ])
 
-
-
   if not os.path.isdir(args.data_path):
     os.makedirs(args.data_path)
-  traindir = os.path.join(args.data_path, 'train')
-  valdir = os.path.join(args.data_path, 'val')
-  train_dataset = dset.ImageFolder(traindir, transforms_audio)
-  val_dataset = dset.ImageFolder(valdir, transforms_audio)
+  train_dir = os.path.join(args.data_path, 'train')
+  val_dir = os.path.join(args.data_path, 'val')
+
+  if args.dataset == "arctic":
+    # TODO No ImageFolder equivalent for audio. Need to create a Dataset manually
+    train_dataset = dset.ImageFolder(train_dir, transforms_audio)
+    val_dataset = dset.ImageFolder(val_dir, transforms_audio)
+    num_classes = 2
+  elif args.dataset == 'vctk':
+    train_dataset = dset.VCTK(train_dir, train=True, transform=transforms_audio, download=True)
+    val_dataset = dset.VCTK(val_dir, train=False, transform=transforms_audio, download=True)
+    num_classes = 10
+  else:
+    assert False, "Dataset is incorrect"
+
   train_loader = torch.utils.data.DataLoader(
     train_dataset,
     batch_size=args.batch_size, shuffle=True,
@@ -88,15 +97,6 @@ def main():
     val_dataset,
     batch_size=args.batch_size, shuffle=False,
     num_workers=args.workers, pin_memory=True)
-
-
-  if args.dataset == "arctic":
-    num_classes = 2
-  elif args.dataset == 'vctk':
-    train_data = dset.CIFAR10(args.data_path, train=True, transform=transforms_audio, download=True)
-    test_data = dset.CIFAR10(args.data_path, train=False, transform=transforms_audio, download=True)
-    num_classes = 10
-
 
 
   print_log("=> creating model '{}'".format(args.arch), log)
