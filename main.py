@@ -17,7 +17,7 @@ model_names = ['alexnet']
 
 parser = argparse.ArgumentParser(description='Trains AlexNet on CMU Arctic', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('data_path', type=str, help='Path to dataset')
-parser.add_argument('--dataset', type=str, choices=['arctic', 'vctk'])
+parser.add_argument('--dataset', type=str, default='yesno', choices=['arctic', 'vctk', 'yesno'])
 parser.add_argument('--arch', metavar='ARCH', default='alexnet', choices=model_names, help='model architecture: ' + ' | '.join(model_names) + ' (default: alexnet)')
 # Optimization options
 parser.add_argument('--epochs', type=int, default=300, help='Number of epochs to train.')
@@ -77,7 +77,7 @@ def main():
   train_dir = os.path.join(args.data_path, 'train')
   val_dir = os.path.join(args.data_path, 'val')
 
-  if args.dataset == "arctic":
+  if args.dataset == 'arctic':
     # TODO No ImageFolder equivalent for audio. Need to create a Dataset manually
     train_dataset = dset.ImageFolder(train_dir, transforms_audio)
     val_dataset = dset.ImageFolder(val_dir, transforms_audio)
@@ -86,8 +86,12 @@ def main():
     train_dataset = dset.VCTK(train_dir, transform=transforms_audio, download=True)
     val_dataset = dset.VCTK(val_dir, transform=transforms_audio, download=True)
     num_classes = 10
+  elif args.dataset == 'yesno':
+    train_dataset = dset.YESNO(train_dir, transform=transforms_audio, download=True)
+    val_dataset = dset.YESNO(val_dir, transform=transforms_audio, download=True)
+    num_classes = 2
   else:
-    assert False, "Dataset is incorrect"
+    assert False, 'Dataset is incorrect'
 
   train_loader = torch.utils.data.DataLoader(
     train_dataset,
