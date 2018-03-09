@@ -8,6 +8,7 @@ import torchaudio.datasets as dset
 import torchaudio.transforms as transforms
 from utils import AverageMeter, RecorderMeter, time_string, convert_secs2time
 import models
+from models.alexnet import AlexNet
 
 model_names = sorted(name for name in models.__dict__
   if name.islower() and not name.startswith("__")
@@ -34,8 +35,8 @@ parser.add_argument('--resume', default='./logs', type=str, metavar='PATH', help
 parser.add_argument('--start_epoch', default=0, type=int, metavar='N', help='manual epoch number (useful on restarts)')
 parser.add_argument('--evaluate', dest='evaluate', action='store_true', help='evaluate model on validation set')
 # Acceleration
-parser.add_argument('--ngpu', type=int, default=1, help='0 = CPU.')
-parser.add_argument('--workers', type=int, default=2, help='number of data loading workers (default: 2)')
+parser.add_argument('--ngpu', type=int, default=0, help='0 = CPU.')
+parser.add_argument('--workers', type=int, default=1, help='number of data loading workers (default: 2)')
 # random seed
 parser.add_argument('--manualSeed', type=int, help='manual seed')
 args = parser.parse_args()
@@ -105,10 +106,11 @@ def main():
 
   print_log("=> creating model '{}'".format(args.arch), log)
   # Init model, criterion, and optimizer
-  net = models.__dict__[args.arch](num_classes)
+  # net = models.__dict__[args.arch](num_classes)
+  net = AlexNet(num_classes)
   print_log("=> network :\n {}".format(net), log)
 
-  net = torch.nn.DataParallel(net, device_ids=list(range(args.ngpu)))
+  # net = torch.nn.DataParallel(net, device_ids=list(range(args.ngpu)))
 
   # define loss function (criterion) and optimizer
   criterion = torch.nn.CrossEntropyLoss()
