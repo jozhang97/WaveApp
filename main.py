@@ -195,6 +195,11 @@ def train(train_loader, model, criterion, optimizer, epoch, log):
 
   end = time.time()
   for i, (input, target) in enumerate(train_loader):
+    # TODO Do this in dataset specific file, this is just to get it to run.
+    target = np.array([0, 1, 1, 1, 1, 1, 1, 0, 0, 0])  # Just for debugging yesno
+    target = torch.from_numpy(target)
+    input = input.view(input.size(0), 1, input.size(1))  # Flip channels and length
+
     # measure data loading time
     data_time.update(time.time() - end)
 
