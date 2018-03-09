@@ -22,7 +22,7 @@ parser.add_argument('--dataset', type=str, default='yesno', choices=['arctic', '
 parser.add_argument('--arch', metavar='ARCH', default='alexnet', choices=model_names, help='model architecture: ' + ' | '.join(model_names) + ' (default: alexnet)')
 # Optimization options
 parser.add_argument('--epochs', type=int, default=300, help='Number of epochs to train.')
-parser.add_argument('--batch_size', type=int, default=128, help='Batch size.')
+parser.add_argument('--batch_size', type=int, default=10, help='Batch size.')
 parser.add_argument('--learning_rate', type=float, default=0.1, help='The Learning Rate.')
 parser.add_argument('--momentum', type=float, default=0.9, help='Momentum.')
 parser.add_argument('--decay', type=float, default=0.0005, help='Weight decay (L2 penalty).')
@@ -65,9 +65,9 @@ def main():
 
   # Data loading code
   # Any other preprocessings? http://pytorch.org/audio/transforms.html
-  sample_length = 40000
-  scale = transforms.Scale(),
-  padtrim = transforms.PadTrim(sample_length),
+  sample_length = 400000
+  scale = transforms.Scale()
+  padtrim = transforms.PadTrim(sample_length)
   downmix = transforms.DownmixMono()
   transforms_audio = transforms.Compose([
     scale, padtrim, downmix
@@ -96,8 +96,12 @@ def main():
 
   train_loader = torch.utils.data.DataLoader(
     train_dataset,
-    batch_size=args.batch_size, shuffle=True,
-    num_workers=args.workers, pin_memory=True, sampler=None)
+    batch_size=args.batch_size,
+    shuffle=True,
+    num_workers=args.workers,
+    # pin_memory=True, # What is this?
+    # sampler=None     # What is this?
+  )
   val_loader = torch.utils.data.DataLoader(
     val_dataset,
     batch_size=args.batch_size, shuffle=False,
