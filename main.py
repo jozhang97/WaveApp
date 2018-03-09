@@ -10,6 +10,8 @@ from utils import AverageMeter, RecorderMeter, time_string, convert_secs2time
 import models
 from models.alexnet import AlexNet
 
+import numpy as np
+
 model_names = sorted(name for name in models.__dict__
   if name.islower() and not name.startswith("__")
   and callable(models.__dict__[name]))

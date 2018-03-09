@@ -12,6 +12,9 @@ has a wrapper class that merges blocks together
 has functions that output the end product
 '''
 
+# Input must be N x C x L
+# (batch_size x num_channels x length)
+
 class AlexNet(nn.Module):
   def __init__(self, num_classes):
     super(AlexNet, self).__init__()
@@ -32,7 +35,7 @@ class AlexNet(nn.Module):
       nn.MaxPool1d(kernel_size=3, stride=2),
     )
 
-    self.latent_vector_size = 36 * 256  # TODO is it tho?
+    self.latent_vector_size = 256 * 12442
 
     self.classifier = nn.Sequential(
       nn.Linear(self.latent_vector_size, 4096),
