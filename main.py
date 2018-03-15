@@ -19,7 +19,7 @@ model_names = sorted(name for name in models.__dict__
 model_names = ['alexnet']
 
 parser = argparse.ArgumentParser(description='Trains AlexNet on CMU Arctic', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument('data_path', type=str, help='Path to dataset')
+parser.add_argument('data_path', type=str, default='data', help='Path to dataset')
 parser.add_argument('--dataset', type=str, default='yesno', choices=['arctic', 'vctk', 'yesno'])
 parser.add_argument('--arch', metavar='ARCH', default='alexnet', choices=model_names, help='model architecture: ' + ' | '.join(model_names) + ' (default: alexnet)')
 # Optimization options
@@ -67,7 +67,7 @@ def main():
 
   # Data loading code
   # Any other preprocessings? http://pytorch.org/audio/transforms.html
-  sample_length = 400000
+  sample_length = 10000
   scale = transforms.Scale()
   padtrim = transforms.PadTrim(sample_length)
   downmix = transforms.DownmixMono()
@@ -160,6 +160,7 @@ def main():
     print_log('\n==>>{:s} [Epoch={:03d}/{:03d}] {:s} [learning_rate={:6.4f}]'.format(time_string(), epoch, args.epochs, need_time, current_learning_rate) \
                 + ' [Best : Accuracy={:.2f}, Error={:.2f}]'.format(recorder.max_accuracy(False), 100-recorder.max_accuracy(False)), log)
 
+    print("One epoch")
     # train for one epoch
     train_acc, train_los = train(train_loader, net, criterion, optimizer, epoch, log)
 
@@ -214,7 +215,8 @@ def train(train_loader, model, criterion, optimizer, epoch, log):
     loss = criterion(output, target_var)
 
     # measure accuracy and record loss
-    prec1, prec5 = accuracy(output.data, target, topk=(1, 5))
+    #prec1, prec5 = accuracy(output.data, target, topk=(1, 5))
+    prec1, prec5 = accuracy(output.data, target, topk=(1, 2))  # we don't have 5 classes yet lol 
     losses.update(loss.data[0], input.size(0))
     top1.update(prec1[0], input.size(0))
     top5.update(prec5[0], input.size(0))
