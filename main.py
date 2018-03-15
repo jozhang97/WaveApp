@@ -83,8 +83,8 @@ def main():
 
   if args.dataset == 'arctic':
     # TODO No ImageFolder equivalent for audio. Need to create a Dataset manually
-    train_dataset = Arctic(train_dir, transform=transforms_audio, download=True)
-    val_dataset = Arctic(val_dir, transform=transforms_audio, download=True)
+    train_dataset = Arctic(train_dir,'aew', transform=transforms_audio, download=True)
+    val_dataset = Arctic(val_dir, 'aew',transform=transforms_audio, download=True)
     num_classes = 2
   elif args.dataset == 'vctk':
     train_dataset = dset.VCTK(train_dir, transform=transforms_audio, download=True)

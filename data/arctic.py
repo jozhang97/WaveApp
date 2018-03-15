@@ -26,15 +26,11 @@ class Arctic(data.Dataset):
 
 
     #can take these in as param for general dataloader
-    raw_folder = 'arctic/cmu_us_aew_arctic/raw'
-    processed_folder = 'arctic/cmu_us_aew_arctic/processed'
-    url = 'http://festvox.org/cmu_arctic/packed/cmu_us_aew_arctic.tar.bz2'
-    dset_path = 'cmu_us_aew_arctic/wav'
-    processed_file = 'arctic_aew.pt'
 
 
 
-    def __init__(self, root, transform=None, target_transform=None, download=False, dev_mode=False):
+
+    def __init__(self, root, dataset, transform=None, target_transform=None, download=False, dev_mode=False):
         self.root = os.path.expanduser(root)
         self.transform = transform
         self.target_transform = target_transform
@@ -43,6 +39,13 @@ class Arctic(data.Dataset):
         self.labels = []
         self.num_samples = 0
         self.max_len = 0
+        
+
+        self.raw_folder = 'arctic/cmu_us_%s_arctic/raw' % dataset
+        self.processed_folder = 'arctic/cmu_us_%s_arctic/processed' % dataset
+        self.url = 'http://festvox.org/cmu_arctic/packed/cmu_us_%s_arctic.tar.bz2' % dataset
+        self.dset_path = 'cmu_us_%s_arctic/wav' % dataset
+        self.processed_file = 'arctic_%s.pt' % dataset
 
         if download:
             self.download()
