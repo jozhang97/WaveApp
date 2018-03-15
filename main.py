@@ -6,6 +6,7 @@ import torch
 import torch.backends.cudnn as cudnn
 import torchaudio.datasets as dset
 import torchaudio.transforms as transforms
+from data.arctic import Arctic
 from utils import AverageMeter, RecorderMeter, time_string, convert_secs2time
 import models
 from models.alexnet import AlexNet
@@ -82,8 +83,8 @@ def main():
 
   if args.dataset == 'arctic':
     # TODO No ImageFolder equivalent for audio. Need to create a Dataset manually
-    train_dataset = dset.ImageFolder(train_dir, transforms_audio)
-    val_dataset = dset.ImageFolder(val_dir, transforms_audio)
+    train_dataset = Arctic(train_dir, transform=transforms_audio, download=True)
+    val_dataset = Arctic(val_dir, transform=transforms_audio, download=True)
     num_classes = 2
   elif args.dataset == 'vctk':
     train_dataset = dset.VCTK(train_dir, transform=transforms_audio, download=True)
@@ -110,10 +111,19 @@ def main():
     num_workers=args.workers, pin_memory=True)
 
 
+  # for i, (input, target) in enumerate(train_loader):
+  #   # TODO Do this in dataset specific file, this is just to get it to run.
+  #   #target = np.array([0, 1, 1, 1, 1, 1, 1, 0, 0, 0])  # Just for debugging yesno
+  #   import ipdb; ipdb.set_trace()
+
+  #   target = torch.from_numpy(target)
+
+
   print_log("=> creating model '{}'".format(args.arch), log)
   # Init model, criterion, and optimizer
   # net = models.__dict__[args.arch](num_classes)
   net = AlexNet(num_classes)
+  #
   print_log("=> network :\n {}".format(net), log)
 
   # net = torch.nn.DataParallel(net, device_ids=list(range(args.ngpu)))
@@ -196,7 +206,9 @@ def train(train_loader, model, criterion, optimizer, epoch, log):
   end = time.time()
   for i, (input, target) in enumerate(train_loader):
     # TODO Do this in dataset specific file, this is just to get it to run.
-    target = np.array([0, 1, 1, 1, 1, 1, 1, 0, 0, 0])  # Just for debugging yesno
+    #target = np.array([0, 1, 1, 1, 1, 1, 1, 0, 0, 0])  # Just for debugging yesno
+    import ipdb; ipdb.set_trace()
+
     target = torch.from_numpy(target)
     input = input.view(input.size(0), 1, input.size(1))  # Flip channels and length
 
