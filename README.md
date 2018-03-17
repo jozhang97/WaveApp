@@ -36,3 +36,9 @@ Ex. for cmu_us_aew_arctic datset
 1. Integrate a logger (either TensorboardX or Tensorflow's Tensorboard).
 2. Set up dataset for CMU Arctic and generic datasets.
 3. Use a better architecture (much later).
+
+### Instructions:
+
+#### Tensorboard:
+1. pip install tensorboardX
+2. tensorboard --logdir runs

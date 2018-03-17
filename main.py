@@ -244,9 +244,13 @@ def train(train_loader, model, criterion, optimizer, epoch, log, train_dataset):
     losses.update(loss.data[0], input.size(0))
     top1.update(prec1[0], input.size(0))
     top5.update(prec5[0], input.size(0))
-    writer.add_scalar('Cross Entropy Loss', loss.data[0], i)
-    writer.add_scalar('Precision 1', prec1[0], i)
-    writer.add_scalar('Precision 5', prec5[0], i)
+    writer.add_scalar('Training Loss', loss.data[0], i)
+    writer.add_scalar('Accuracy Top 1', prec1[0], i)
+    writer.add_scalar('Accuracy Top 5', prec5[0], i)
+    if i == 0:
+      fake_audio = np.array([0, 1, 1, 1, 1, 1, 1, 0, 0, 0])
+      writer.add_audio("First Audio Per Epoch",
+                                   fake_audio, sample_rate=44100)
 
     # compute gradient and do SGD step
     optimizer.zero_grad()
@@ -288,6 +292,7 @@ def validate(val_loader, model, criterion, log, val_dataset):
     if args.use_cuda:
       target = target.cuda(async=True)
       input = input.cuda()
+    target = np.array([0, 1, 1, 1, 1, 1, 1, 0, 0, 0])
     input_var = torch.autograd.Variable(input, volatile=True)
     target_var = torch.autograd.Variable(target, volatile=True)
 
@@ -295,12 +300,17 @@ def validate(val_loader, model, criterion, log, val_dataset):
     output = model(input_var)
     ouptut = val_dataset.postprocess_target(output)
     loss = criterion(output, target_var)
+    entropy = get_entropy(target)
+    writer.add_scalar('Entropy', entropy, i)
 
     # measure accuracy and record loss
     prec1, prec5 = accuracy(output.data, target, topk=(1, 2))
     losses.update(loss.data[0], input.size(0))
+    writer.add_scalar('Validation Loss', loss.data[0], i)
     top1.update(prec1[0], input.size(0))
     top5.update(prec5[0], input.size(0))
+    writer.add_scalar('Accuracy Top 1', prec1[0], i)
+    writer.add_scalar('Accuracy Top 5', prec5[0], i)
 
   print_log('  **Test** Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f} Error@1 {error1:.3f}'.format(top1=top1, top5=top5, error1=100-top1.avg), log)
 
@@ -376,6 +386,10 @@ def accuracy(output, target, topk=(1,)):
     correct_k = correct[:k].view(-1).float().sum(0)
     res.append(correct_k.mul_(100.0 / batch_size))
   return res
+
+def get_entropy(labels, base=None):
+  value,counts = np.unique(labels, return_counts=True)
+  return entropy(counts, base=base)
 
 if __name__ == '__main__':
   main()
