@@ -1,0 +1,3 @@
+[submodule "waveapp-server"]
+	path = waveapp-server
+	url = https://github.com/erikon/waveapp-server.git
