@@ -23,19 +23,19 @@ class AlexNet(nn.Module):
       nn.Conv1d(1, 96, 11, stride=4, padding=0, dilation=2),
       nn.ReLU(inplace=True),
       nn.MaxPool1d(kernel_size=3, stride=2),
-      nn.Conv1d(96, 256, kernel_size=5, padding=2, groups=2, dilation=4),
+      nn.Conv1d(96, 256, kernel_size=5, stride=2, padding=2, groups=2, dilation=4),
       nn.ReLU(inplace=True),
       nn.MaxPool1d(kernel_size=3, stride=2),
-      nn.Conv1d(256, 384, kernel_size=3, padding=1, dilation=8),
+      nn.Conv1d(256, 384, kernel_size=3, stride=2, padding=1, dilation=8),
       nn.ReLU(inplace=True),
-      nn.Conv1d(384, 384, kernel_size=3, padding=1, groups=2, dilation=16),
+      nn.Conv1d(384, 384, kernel_size=3, stride=1, padding=1, groups=2, dilation=16),
       nn.ReLU(inplace=True),
-      nn.Conv1d(384, 256, kernel_size=3, padding=1, groups=2, dilation=32),
+      nn.Conv1d(384, 256, kernel_size=3, stride=1, padding=1, groups=2, dilation=32),
       nn.ReLU(inplace=True),
       nn.MaxPool1d(kernel_size=3, stride=2),
     )
 
-    self.latent_vector_size = 256 * 12442
+    self.latent_vector_size = 256 * 27
 
     self.classifier = nn.Sequential(
       nn.Linear(self.latent_vector_size, 4096),
