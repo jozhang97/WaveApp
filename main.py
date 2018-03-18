@@ -6,6 +6,7 @@ import torch
 import torch.backends.cudnn as cudnn
 import torchaudio.datasets as dset
 import torchaudio.transforms as transforms
+from data.arctic import Arctic
 from utils import AverageMeter, RecorderMeter, time_string, convert_secs2time
 import models
 from models.alexnet import AlexNet
@@ -88,9 +89,9 @@ def main():
   #Choose dataset to use
   if args.dataset == 'arctic':
     # TODO No ImageFolder equivalent for audio. Need to create a Dataset manually
-    train_dataset = dset.ImageFolder(train_dir, transforms_audio)
-    val_dataset = dset.ImageFolder(val_dir, transforms_audio)
-    num_classes = 2
+    train_dataset = Arctic(train_dir, transform=transforms_audio, download=True)
+    val_dataset = Arctic(val_dir, transform=transforms_audio, download=True)
+    num_classes = 4
   elif args.dataset == 'vctk':
     train_dataset = dset.VCTK(train_dir, transform=transforms_audio, download=True)
     val_dataset = dset.VCTK(val_dir, transform=transforms_audio, download=True)
@@ -120,6 +121,7 @@ def main():
   # Init model, criterion, and optimizer
   # net = models.__dict__[args.arch](num_classes)
   net = AlexNet(num_classes)
+  #
   print_log("=> network :\n {}".format(net), log)
 
   # net = torch.nn.DataParallel(net, device_ids=list(range(args.ngpu)))
@@ -153,7 +155,7 @@ def main():
     print_log("=> do not use any checkpoint for {} model".format(args.arch), log)
 
   if args.evaluate:
-    validate(val_loader, net, criterion, log)
+    validate(val_loader, net, criterion, log, val_dataset)
     return
 
   # Main loop
@@ -173,11 +175,11 @@ def main():
     print("One epoch")
     # train for one epoch
     # Call to train (note that our previous net is passed into the model argument)
-    train_acc, train_los = train(train_loader, net, criterion, optimizer, epoch, log)
+    train_acc, train_los = train(train_loader, net, criterion, optimizer, epoch, log, train_dataset)
 
     # evaluate on validation set
     #val_acc,   val_los   = extract_features(test_loader, net, criterion, log)
-    val_acc,   val_los   = validate(val_loader, net, criterion, log)
+    val_acc,   val_los   = validate(val_loader, net, criterion, log, val_dataset)
     is_best = recorder.update(epoch, train_los, train_acc, val_los, val_acc)
 
     save_checkpoint({
@@ -196,7 +198,7 @@ def main():
   log.close()
 
 # train function (forward, backward, update)
-def train(train_loader, model, criterion, optimizer, epoch, log):
+def train(train_loader, model, criterion, optimizer, epoch, log, train_dataset):
   batch_time = AverageMeter()
   data_time = AverageMeter()
   losses = AverageMeter()
@@ -208,8 +210,16 @@ def train(train_loader, model, criterion, optimizer, epoch, log):
   end = time.time()
   for i, (input, target) in enumerate(train_loader):
     # TODO Do this in dataset specific file, this is just to get it to run.
-    target = np.array([0, 1, 1, 1, 1, 1, 1, 0, 0, 0])  # Just for debugging yesno
-    target = torch.from_numpy(target)
+    #target = np.array([0, 1, 1, 1, 1, 1, 1, 0, 0, 0])  # Just for debugging yesno
+    #import ipdb; ipdb.set_trace()
+    input = train_dataset.preprocess_input(input)
+    target = train_dataset.preprocess_input(target)
+    target = target.type(torch.LongTensor)
+    try:
+      target = torch.from_numpy(target)
+    except RuntimeError:
+      pass
+
     input = input.view(input.size(0), 1, input.size(1))  # Flip channels and length
 
     # measure data loading time
@@ -223,7 +233,10 @@ def train(train_loader, model, criterion, optimizer, epoch, log):
 
     # compute output
     output = model(input_var)
+    output = train_dataset.postprocess_target(output)
+    #import ipdb; ipdb.set_trace()
     loss = criterion(output, target_var)
+
 
     # measure accuracy and record loss
     #prec1, prec5 = accuracy(output.data, target, topk=(1, 5))
@@ -245,6 +258,7 @@ def train(train_loader, model, criterion, optimizer, epoch, log):
     end = time.time()
 
     if i % args.print_freq == 0:
+      #import ipdb; ipdb.set_trace()
       print_log('  Epoch: [{:03d}][{:03d}/{:03d}]   '
             'Time {batch_time.val:.3f} ({batch_time.avg:.3f})   '
             'Data {data_time.val:.3f} ({data_time.avg:.3f})   '
@@ -256,7 +270,7 @@ def train(train_loader, model, criterion, optimizer, epoch, log):
   print_log('  **Train** Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f} Error@1 {error1:.3f}'.format(top1=top1, top5=top5, error1=100-top1.avg), log)
   return top1.avg, losses.avg
 
-def validate(val_loader, model, criterion, log):
+def validate(val_loader, model, criterion, log, val_dataset):
   losses = AverageMeter()
   top1 = AverageMeter()
   top5 = AverageMeter()
@@ -265,6 +279,12 @@ def validate(val_loader, model, criterion, log):
   model.eval()
 
   for i, (input, target) in enumerate(val_loader):
+    input = val_dataset.preprocess_input(input)
+    target = val_dataset.preprocess_input(target)
+    target = target.type(torch.LongTensor)
+
+    input = input.view(input.size(0), 1, input.size(1))  # Flip channels and leng
+
     if args.use_cuda:
       target = target.cuda(async=True)
       input = input.cuda()
@@ -273,10 +293,11 @@ def validate(val_loader, model, criterion, log):
 
     # compute output
     output = model(input_var)
+    ouptut = val_dataset.postprocess_target(output)
     loss = criterion(output, target_var)
 
     # measure accuracy and record loss
-    prec1, prec5 = accuracy(output.data, target, topk=(1, 5))
+    prec1, prec5 = accuracy(output.data, target, topk=(1, 2))
     losses.update(loss.data[0], input.size(0))
     top1.update(prec1[0], input.size(0))
     top5.update(prec5[0], input.size(0))
@@ -303,12 +324,11 @@ def extract_features(val_loader, model, criterion, log):
     # compute output
     output, features = model([input_var])
 
-    pdb.set_trace()
 
     loss = criterion(output, target_var)
 
     # measure accuracy and record loss
-    prec1, prec5 = accuracy(output.data, target, topk=(1, 5))
+    prec1, prec5 = accuracy(output.data, target, topk=(1, 2))
     losses.update(loss.data[0], input.size(0))
     top1.update(prec1[0], input.size(0))
     top5.update(prec5[0], input.size(0))
