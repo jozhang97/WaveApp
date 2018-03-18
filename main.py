@@ -293,11 +293,11 @@ def validate(val_loader, model, criterion, log, val_dataset):
 
     # compute output
     output = model(input_var)
-    ouptut = val_dataset.preprocess_target(output)
+    ouptut = val_dataset.postprocess_target(output)
     loss = criterion(output, target_var)
 
     # measure accuracy and record loss
-    prec1, prec5 = accuracy(output.data, target, topk=(1, 5))
+    prec1, prec5 = accuracy(output.data, target, topk=(1, 2))
     losses.update(loss.data[0], input.size(0))
     top1.update(prec1[0], input.size(0))
     top5.update(prec5[0], input.size(0))
@@ -328,7 +328,7 @@ def extract_features(val_loader, model, criterion, log):
     loss = criterion(output, target_var)
 
     # measure accuracy and record loss
-    prec1, prec5 = accuracy(output.data, target, topk=(1, 5))
+    prec1, prec5 = accuracy(output.data, target, topk=(1, 2))
     losses.update(loss.data[0], input.size(0))
     top1.update(prec1[0], input.size(0))
     top5.update(prec5[0], input.size(0))
