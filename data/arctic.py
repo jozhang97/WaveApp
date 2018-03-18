@@ -62,6 +62,7 @@ class Arctic(DataProperty):
         if not self._check_exists():
             raise RuntimeError('Dataset not found.' +
                                ' You can use download=True to download it')
+        #import ipdb; ipdb.set_trace()
         self.data, self.labels = torch.load(os.path.join(
             self.root, self.processed_folder, self.processed_file))
 
@@ -127,7 +128,9 @@ class Arctic(DataProperty):
     def process(self):
         # process and save as torch files
         print('Processing...')
-
+        file = os.path.join(self.root, self.processed_folder, self.processed_file)
+        if os.path.isfile(file):
+            return
         try:
             os.makedirs(os.path.join(self.root, self.processed_folder))
         except OSError as e:
@@ -147,8 +150,9 @@ class Arctic(DataProperty):
                 sig, sr = torchaudio.load(full_path)
                 tensors.append(sig)
                 lengths.append(sig.size(0))
-                label = np.zeros(len(self.paths))
-                label[j] = 1
+                #label = np.zeros(len(self.paths))
+                #label[j] = 1
+                label = j
                 labels.append(label)
             # sort sigs/labels: longest -> shortest
         tensors, labels = zip(*[(b, c) for (a, b, c) in sorted(
