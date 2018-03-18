@@ -83,8 +83,8 @@ def main():
 
   if args.dataset == 'arctic':
     # TODO No ImageFolder equivalent for audio. Need to create a Dataset manually
-    train_dataset = Arctic(train_dir,'aew', transform=transforms_audio, download=True)
-    val_dataset = Arctic(val_dir, 'aew',transform=transforms_audio, download=True)
+    train_dataset = Arctic(train_dir, transform=transforms_audio, download=True)
+    val_dataset = Arctic(val_dir, transform=transforms_audio, download=True)
     num_classes = 2
   elif args.dataset == 'vctk':
     train_dataset = dset.VCTK(train_dir, transform=transforms_audio, download=True)
@@ -207,7 +207,7 @@ def train(train_loader, model, criterion, optimizer, epoch, log):
   for i, (input, target) in enumerate(train_loader):
     # TODO Do this in dataset specific file, this is just to get it to run.
     #target = np.array([0, 1, 1, 1, 1, 1, 1, 0, 0, 0])  # Just for debugging yesno
-    import ipdb; ipdb.set_trace()
+    #import ipdb; ipdb.set_trace()
 
     target = torch.from_numpy(target)
     input = input.view(input.size(0), 1, input.size(1))  # Flip channels and length
@@ -299,7 +299,6 @@ def extract_features(val_loader, model, criterion, log):
     # compute output
     output, features = model([input_var])
 
-    pdb.set_trace()
 
     loss = criterion(output, target_var)
 

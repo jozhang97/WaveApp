@@ -1,9 +1,11 @@
-class Data(object):
-  def preprocess_input(self):
-    pass
+import torch.utils.data as data
 
-  def preproces_target(self):
-    pass
+class DataProperty(data.Dataset):
+  def preprocess_input(self, input):
+  	return input
 
-  def postprocess_target(self):
-    pass
+  def preprocess_target(self, target):
+    return target
+
+  def postprocess_target(self, target):
+    return target

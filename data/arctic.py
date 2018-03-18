@@ -1,14 +1,17 @@
 from __future__ import print_function
-import torch.utils.data as data
+from data.data import DataProperty
+
+#import torch.utils.data as data
 import os
 import os.path
 import shutil
 import errno
 import torch
 import torchaudio
+import numpy as np
 
 
-class Arctic(data.Dataset):
+class Arctic(DataProperty):
     """ Arctic aew set 'http://festvox.org/cmu_arctic/packed/cmu_us_aew_arctic.tar.bz2'
     Args:
         root (string): Root directory of dataset where ``processed/training.pt``
@@ -30,7 +33,7 @@ class Arctic(data.Dataset):
 
 
 
-    def __init__(self, root, dataset, transform=None, target_transform=None, download=False, dev_mode=False):
+    def __init__(self, root, transform=None, target_transform=None, download=False, dev_mode=False):
         self.root = os.path.expanduser(root)
         self.transform = transform
         self.target_transform = target_transform
@@ -39,16 +42,22 @@ class Arctic(data.Dataset):
         self.labels = []
         self.num_samples = 0
         self.max_len = 0
-        
-
-        self.raw_folder = 'arctic/cmu_us_%s_arctic/raw' % dataset
-        self.processed_folder = 'arctic/cmu_us_%s_arctic/processed' % dataset
-        self.url = 'http://festvox.org/cmu_arctic/packed/cmu_us_%s_arctic.tar.bz2' % dataset
-        self.dset_path = 'cmu_us_%s_arctic/wav' % dataset
-        self.processed_file = 'arctic_%s.pt' % dataset
+        self.datasets = ['bdl', 'slt', 'jmk', 'awb']
+        self.processed_folder = 'arctic/processed'
+        self.processed_file = 'arctic.pt'
+        self.paths = []
 
         if download:
-            self.download()
+            for d in self.datasets:
+                raw_folder = 'arctic/cmu_us_%s_arctic' % d
+                url = 'http://festvox.org/cmu_arctic/packed/cmu_us_%s_arctic.tar.bz2' % d
+                dset_path = 'cmu_us_%s_arctic/wav' % d
+                dset_abs_path = os.path.join(
+                    self.root, raw_folder, dset_path)
+                self.paths.append(dset_abs_path)
+                self.download(raw_folder,url,dset_abs_path)
+
+            self.process()
 
         if not self._check_exists():
             raise RuntimeError('Dataset not found.' +
@@ -79,7 +88,7 @@ class Arctic(data.Dataset):
     def _check_exists(self):
         return os.path.exists(os.path.join(self.root, self.processed_folder, self.processed_file))
 
-    def download(self):
+    def download(self, raw_folder, url, dset_abs_path):
         """Download the arctic data if it doesn't exist in processed_folder already."""
         from six.moves import urllib
         import tarfile
@@ -87,26 +96,20 @@ class Arctic(data.Dataset):
         if self._check_exists():
             return
 
-        raw_abs_dir = os.path.join(self.root, self.raw_folder)
-        processed_abs_dir = os.path.join(self.root, self.processed_folder)
-        dset_abs_path = os.path.join(
-            self.root, self.raw_folder, self.dset_path)
+        raw_abs_dir = os.path.join(self.root, raw_folder)
 
         # download files
         try:
-            os.makedirs(os.path.join(self.root, self.raw_folder))
-            os.makedirs(os.path.join(self.root, self.processed_folder))
+            os.makedirs(os.path.join(self.root, raw_folder))
         except OSError as e:
             if e.errno == errno.EEXIST:
                 pass
             else:
                 raise
 
-        url = self.url
         print('Downloading ' + url)
         filename = url.rpartition('/')[2]
-        file_path = os.path.join(self.root, self.raw_folder, filename)
-        #import ipdb; ipdb.set_trace()
+        file_path = os.path.join(self.root, raw_folder, filename)
         if not os.path.isfile(file_path):
             data = urllib.request.urlopen(url)
             with open(file_path, 'wb') as f:
@@ -118,28 +121,40 @@ class Arctic(data.Dataset):
                 zip_f.extractall(raw_abs_dir)
         else:
             print("Tar file already extracted")
+        # if not self.dev_mode:
+        #     os.unlink(file_path)
 
-        if not self.dev_mode:
-            os.unlink(file_path)
-
+    def process(self):
         # process and save as torch files
         print('Processing...')
 
-        audios = [x for x in os.listdir(dset_abs_path) if ".wav" in x]
-        print("Found {} audio files".format(len(audios)))
+        try:
+            os.makedirs(os.path.join(self.root, self.processed_folder))
+        except OSError as e:
+            if e.errno == errno.EEXIST:
+                pass
+            else:
+                raise
+
         tensors = []
         labels = []
         lengths = []
-        for i, f in enumerate(audios):
-            full_path = os.path.join(dset_abs_path, f)
-            sig, sr = torchaudio.load(full_path)
-            tensors.append(sig)
-            lengths.append(sig.size(0))
-            labels.append(os.path.basename(f).split(".", 1)[0].split("_"))
-        # sort sigs/labels: longest -> shortest
+        for j, p in enumerate(self.paths):
+            audios = [x for x in os.listdir(p) if ".wav" in x]
+            print("Found {} audio files".format(len(audios)))
+            for i, f in enumerate(audios):
+                full_path = os.path.join(p, f)
+                sig, sr = torchaudio.load(full_path)
+                tensors.append(sig)
+                lengths.append(sig.size(0))
+                label = np.zeros(len(self.paths))
+                label[j] = 1
+                labels.append(label)
+            # sort sigs/labels: longest -> shortest
         tensors, labels = zip(*[(b, c) for (a, b, c) in sorted(
             zip(lengths, tensors, labels), key=lambda x: x[0], reverse=True)])
         self.max_len = tensors[0].size(0)
+        
         torch.save(
             (tensors, labels),
             os.path.join(
@@ -148,7 +163,5 @@ class Arctic(data.Dataset):
                 self.processed_file
             )
         )
-        if not self.dev_mode:
-            shutil.rmtree(raw_abs_dir, ignore_errors=True)
 
         print('Done!')
