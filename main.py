@@ -10,6 +10,7 @@ from data.arctic import Arctic
 from utils import AverageMeter, RecorderMeter, time_string, convert_secs2time
 import models
 from models.alexnet import AlexNet
+from tensorboardX import SummaryWriter
 
 import numpy as np
 
@@ -19,8 +20,10 @@ model_names = sorted(name for name in models.__dict__
 # TODO Fix ^
 model_names = ['alexnet']
 
+writer = SummaryWriter()
+
 parser = argparse.ArgumentParser(description='Trains AlexNet on CMU Arctic', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument('data_path', type=str, help='Path to dataset')
+parser.add_argument('data_path', type=str, default='data', help='Path to dataset')
 parser.add_argument('--dataset', type=str, default='yesno', choices=['arctic', 'vctk', 'yesno'])
 parser.add_argument('--arch', metavar='ARCH', default='alexnet', choices=model_names, help='model architecture: ' + ' | '.join(model_names) + ' (default: alexnet)')
 # Optimization options
@@ -43,6 +46,8 @@ parser.add_argument('--workers', type=int, default=1, help='number of data loadi
 # random seed
 parser.add_argument('--manualSeed', type=int, help='manual seed')
 args = parser.parse_args()
+
+# Use GPU if available
 args.use_cuda = args.ngpu>0 and torch.cuda.is_available()
 
 if args.manualSeed is None:
@@ -68,7 +73,7 @@ def main():
 
   # Data loading code
   # Any other preprocessings? http://pytorch.org/audio/transforms.html
-  sample_length = 400000
+  sample_length = 10000
   scale = transforms.Scale()
   padtrim = transforms.PadTrim(sample_length)
   downmix = transforms.DownmixMono()
@@ -81,11 +86,16 @@ def main():
   train_dir = os.path.join(args.data_path, 'train')
   val_dir = os.path.join(args.data_path, 'val')
 
+  #Choose dataset to use
   if args.dataset == 'arctic':
     # TODO No ImageFolder equivalent for audio. Need to create a Dataset manually
     train_dataset = Arctic(train_dir, transform=transforms_audio, download=True)
     val_dataset = Arctic(val_dir, transform=transforms_audio, download=True)
+<<<<<<< HEAD
     num_classes = 2
+=======
+    num_classes = 4
+>>>>>>> b928b912b29db89f27abdea5e4b252b80cc94b40
   elif args.dataset == 'vctk':
     train_dataset = dset.VCTK(train_dir, transform=transforms_audio, download=True)
     val_dataset = dset.VCTK(val_dir, transform=transforms_audio, download=True)
@@ -111,14 +121,7 @@ def main():
     num_workers=args.workers, pin_memory=True)
 
 
-  # for i, (input, target) in enumerate(train_loader):
-  #   # TODO Do this in dataset specific file, this is just to get it to run.
-  #   #target = np.array([0, 1, 1, 1, 1, 1, 1, 0, 0, 0])  # Just for debugging yesno
-  #   import ipdb; ipdb.set_trace()
-
-  #   target = torch.from_numpy(target)
-
-
+  #Feed in respective model file to pass into model (alexnet.py)
   print_log("=> creating model '{}'".format(args.arch), log)
   # Init model, criterion, and optimizer
   # net = models.__dict__[args.arch](num_classes)
@@ -131,9 +134,11 @@ def main():
   # define loss function (criterion) and optimizer
   criterion = torch.nn.CrossEntropyLoss()
 
+  # Define stochastic gradient descent as optimizer (run backprop on random small batch)
   optimizer = torch.optim.SGD(net.parameters(), state['learning_rate'], momentum=state['momentum'],
                 weight_decay=state['decay'], nesterov=True)
 
+  #Sets use for GPU if available
   if args.use_cuda:
     net.cuda()
     criterion.cuda()
@@ -155,12 +160,14 @@ def main():
     print_log("=> do not use any checkpoint for {} model".format(args.arch), log)
 
   if args.evaluate:
-    validate(val_loader, net, criterion, log)
+    validate(val_loader, net, criterion, log, val_dataset)
     return
 
   # Main loop
   start_time = time.time()
   epoch_time = AverageMeter()
+
+  # Training occurs here
   for epoch in range(args.start_epoch, args.epochs):
     current_learning_rate = adjust_learning_rate(optimizer, epoch, args.gammas, args.schedule)
 
@@ -170,12 +177,14 @@ def main():
     print_log('\n==>>{:s} [Epoch={:03d}/{:03d}] {:s} [learning_rate={:6.4f}]'.format(time_string(), epoch, args.epochs, need_time, current_learning_rate) \
                 + ' [Best : Accuracy={:.2f}, Error={:.2f}]'.format(recorder.max_accuracy(False), 100-recorder.max_accuracy(False)), log)
 
+    print("One epoch")
     # train for one epoch
-    train_acc, train_los = train(train_loader, net, criterion, optimizer, epoch, log)
+    # Call to train (note that our previous net is passed into the model argument)
+    train_acc, train_los = train(train_loader, net, criterion, optimizer, epoch, log, train_dataset)
 
     # evaluate on validation set
     #val_acc,   val_los   = extract_features(test_loader, net, criterion, log)
-    val_acc,   val_los   = validate(val_loader, net, criterion, log)
+    val_acc,   val_los   = validate(val_loader, net, criterion, log, val_dataset)
     is_best = recorder.update(epoch, train_los, train_acc, val_los, val_acc)
 
     save_checkpoint({
@@ -194,7 +203,7 @@ def main():
   log.close()
 
 # train function (forward, backward, update)
-def train(train_loader, model, criterion, optimizer, epoch, log):
+def train(train_loader, model, criterion, optimizer, epoch, log, train_dataset):
   batch_time = AverageMeter()
   data_time = AverageMeter()
   losses = AverageMeter()
@@ -207,9 +216,16 @@ def train(train_loader, model, criterion, optimizer, epoch, log):
   for i, (input, target) in enumerate(train_loader):
     # TODO Do this in dataset specific file, this is just to get it to run.
     #target = np.array([0, 1, 1, 1, 1, 1, 1, 0, 0, 0])  # Just for debugging yesno
-    import ipdb; ipdb.set_trace()
 
-    target = torch.from_numpy(target)
+    #import ipdb; ipdb.set_trace()
+    input = train_dataset.preprocess_input(input)
+    target = train_dataset.preprocess_input(target)
+    target = target.type(torch.LongTensor)
+    try:
+      target = torch.from_numpy(target)
+    except RuntimeError:
+      pass
+
     input = input.view(input.size(0), 1, input.size(1))  # Flip channels and length
 
     # measure data loading time
@@ -223,13 +239,20 @@ def train(train_loader, model, criterion, optimizer, epoch, log):
 
     # compute output
     output = model(input_var)
+    output = train_dataset.postprocess_target(output)
+    #import ipdb; ipdb.set_trace()
     loss = criterion(output, target_var)
 
+
     # measure accuracy and record loss
-    prec1, prec5 = accuracy(output.data, target, topk=(1, 5))
+    #prec1, prec5 = accuracy(output.data, target, topk=(1, 5))
+    prec1, prec5 = accuracy(output.data, target, topk=(1, 2))  # we don't have 5 classes yet lol 
     losses.update(loss.data[0], input.size(0))
     top1.update(prec1[0], input.size(0))
     top5.update(prec5[0], input.size(0))
+    writer.add_scalar('Cross Entropy Loss', loss.data[0], i)
+    writer.add_scalar('Precision 1', prec1[0], i)
+    writer.add_scalar('Precision 5', prec5[0], i)
 
     # compute gradient and do SGD step
     optimizer.zero_grad()
@@ -241,6 +264,7 @@ def train(train_loader, model, criterion, optimizer, epoch, log):
     end = time.time()
 
     if i % args.print_freq == 0:
+      #import ipdb; ipdb.set_trace()
       print_log('  Epoch: [{:03d}][{:03d}/{:03d}]   '
             'Time {batch_time.val:.3f} ({batch_time.avg:.3f})   '
             'Data {data_time.val:.3f} ({data_time.avg:.3f})   '
@@ -252,7 +276,7 @@ def train(train_loader, model, criterion, optimizer, epoch, log):
   print_log('  **Train** Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f} Error@1 {error1:.3f}'.format(top1=top1, top5=top5, error1=100-top1.avg), log)
   return top1.avg, losses.avg
 
-def validate(val_loader, model, criterion, log):
+def validate(val_loader, model, criterion, log, val_dataset):
   losses = AverageMeter()
   top1 = AverageMeter()
   top5 = AverageMeter()
@@ -261,6 +285,12 @@ def validate(val_loader, model, criterion, log):
   model.eval()
 
   for i, (input, target) in enumerate(val_loader):
+    input = val_dataset.preprocess_input(input)
+    target = val_dataset.preprocess_input(target)
+    target = target.type(torch.LongTensor)
+
+    input = input.view(input.size(0), 1, input.size(1))  # Flip channels and leng
+
     if args.use_cuda:
       target = target.cuda(async=True)
       input = input.cuda()
@@ -269,10 +299,11 @@ def validate(val_loader, model, criterion, log):
 
     # compute output
     output = model(input_var)
+    ouptut = val_dataset.postprocess_target(output)
     loss = criterion(output, target_var)
 
     # measure accuracy and record loss
-    prec1, prec5 = accuracy(output.data, target, topk=(1, 5))
+    prec1, prec5 = accuracy(output.data, target, topk=(1, 2))
     losses.update(loss.data[0], input.size(0))
     top1.update(prec1[0], input.size(0))
     top5.update(prec5[0], input.size(0))
@@ -299,12 +330,11 @@ def extract_features(val_loader, model, criterion, log):
     # compute output
     output, features = model([input_var])
 
-    pdb.set_trace()
 
     loss = criterion(output, target_var)
 
     # measure accuracy and record loss
-    prec1, prec5 = accuracy(output.data, target, topk=(1, 5))
+    prec1, prec5 = accuracy(output.data, target, topk=(1, 2))
     losses.update(loss.data[0], input.size(0))
     top1.update(prec1[0], input.size(0))
     top5.update(prec5[0], input.size(0))
