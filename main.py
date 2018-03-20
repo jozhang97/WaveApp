@@ -230,7 +230,7 @@ def train(train_loader, model, criterion, optimizer, epoch, log, train_dataset):
     if args.use_cuda:
       target = target.cuda(async=True)
       input = input.cuda()
-    # print(input)
+      
     input_var = torch.autograd.Variable(input)
     target_var = torch.autograd.Variable(target)
 
@@ -259,7 +259,6 @@ def train(train_loader, model, criterion, optimizer, epoch, log, train_dataset):
     writer.add_scalar('Perplexity', perplexity_val, i)
 
     if i == 0:
-      # fake_audio = np.array([0, 1, 1, 1, 1, 1, 1, 0, 0, 0])
       for i in range(len(input)):
         writer.add_audio("First Audio Per Epoch Sample " + str(i),
                                      input[i], sample_rate=16000)
@@ -304,8 +303,7 @@ def validate(val_loader, model, criterion, log, val_dataset):
     if args.use_cuda:
       target = target.cuda(async=True)
       input = input.cuda()
-    # target = np.array([0, 1, 1, 1, 1, 1, 1, 0, 0, 0])
-    # target = torch.from_numpy(target)
+
     input_var = torch.autograd.Variable(input, volatile=True)
     target_var = torch.autograd.Variable(target, volatile=True)
 
