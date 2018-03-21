@@ -9,15 +9,17 @@ import torchaudio.transforms as transforms
 from utils import AverageMeter, RecorderMeter, time_string, convert_secs2time
 import models
 from models.alexnet import AlexNet
+from models.resnet import ResNet
 from tensorboardX import SummaryWriter
 
 import numpy as np
 
 model_names = sorted(name for name in models.__dict__
-  if name.islower() and not name.startswith("__")
-  and callable(models.__dict__[name]))
+    if name.islower() and not name.startswith("__"))
+
+print(model_names)
 # TODO Fix ^
-model_names = ['alexnet']
+# model_names = ['alexnet']
 
 writer = SummaryWriter()
 
@@ -36,7 +38,7 @@ parser.add_argument('--gammas', type=float, nargs='+', default=[0.1, 0.1], help=
 # Checkpoints
 parser.add_argument('--print_freq', default=200, type=int, metavar='N', help='print frequency (default: 200)')
 parser.add_argument('--save_path', type=str, default='./logs', help='Folder to save checkpoints and log.')
-parser.add_argument('--resume', default='./logs', type=str, metavar='PATH', help='path to latest checkpoint')
+parser.add_argument('--resume', default=None, type=str, metavar='PATH', help='path to latest checkpoint')
 parser.add_argument('--start_epoch', default=0, type=int, metavar='N', help='manual epoch number (useful on restarts)')
 parser.add_argument('--evaluate', dest='evaluate', action='store_true', help='evaluate model on validation set')
 # Acceleration
@@ -59,6 +61,8 @@ cudnn.benchmark = True
 
 def main():
   # Init logger
+  # import ipdb; ipdb.set_trace(context=21)
+
   if not os.path.isdir(args.save_path):
     os.makedirs(args.save_path)
   log = open(os.path.join(args.save_path, 'log_seed_{}.txt'.format(args.manualSeed)), 'w')
@@ -118,8 +122,9 @@ def main():
   #Feed in respective model file to pass into model (alexnet.py)
   print_log("=> creating model '{}'".format(args.arch), log)
   # Init model, criterion, and optimizer
-  # net = models.__dict__[args.arch](num_classes)
-  net = AlexNet(num_classes)
+  m = getattr(models.__dict__[args.arch], args.arch)
+  net = m(num_classes=num_classes, pretrained=args.resume)
+
   print_log("=> network :\n {}".format(net), log)
 
   # net = torch.nn.DataParallel(net, device_ids=list(range(args.ngpu)))
@@ -227,7 +232,7 @@ def train(train_loader, model, criterion, optimizer, epoch, log):
 
     # measure accuracy and record loss
     #prec1, prec5 = accuracy(output.data, target, topk=(1, 5))
-    prec1, prec5 = accuracy(output.data, target, topk=(1, 2))  # we don't have 5 classes yet lol 
+    prec1, prec5 = accuracy(output.data, target, topk=(1, 2))  # we don't have 5 classes yet lol
     losses.update(loss.data[0], input.size(0))
     top1.update(prec1[0], input.size(0))
     top5.update(prec5[0], input.size(0))
