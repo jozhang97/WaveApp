@@ -48,3 +48,10 @@ Ex. for cmu_us_aew_arctic datset
 ### AMI 
 Use this AMI ami-ef650197
 (This will be out of date)
+
+
+to run locally, 
+   `python main.py`
+
+to run with GPUs,
+   `python main.py --ngpu 1`
