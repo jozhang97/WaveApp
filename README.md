@@ -55,3 +55,9 @@ to run locally,
 
 to run with GPUs,
    `python main.py --ngpu 1`
+
+### Issues
+If you notice the error:
+   `ImportError: cannot import name 'DataProperty'`
+   
+Check the `artic.py` file and try changing the import statement `from data import DataProperty` to `from data.data import DataProperty`
