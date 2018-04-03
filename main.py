@@ -245,7 +245,7 @@ def train(train_loader, model, criterion, optimizer, epoch, log, train_dataset):
     entropy_val = 0
     perplexity_val = 0
     for batch_output in output:
-      entropy_val += get_entropy(softmax(batch_output.data.numpy()))
+      entropy_val += get_entropy(softmax(batch_output.data.cpu().numpy()))
       perplexity_val += get_perplexity(entropy_val)
 
     # measure accuracy and record loss

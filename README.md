@@ -42,3 +42,9 @@ Ex. for cmu_us_aew_arctic datset
 #### Tensorboard:
 1. pip install tensorboardX
 2. tensorboard --logdir runs
+
+
+
+### AMI 
+Use this AMI ami-ef650197
+(This will be out of date)
