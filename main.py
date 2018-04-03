@@ -11,6 +11,8 @@ from utils import AverageMeter, RecorderMeter, time_string, convert_secs2time
 import models
 from models.alexnet import AlexNet
 from tensorboardX import SummaryWriter
+from scipy.stats import entropy
+from math import log, exp
 
 import numpy as np
 
@@ -230,6 +232,7 @@ def train(train_loader, model, criterion, optimizer, epoch, log, train_dataset):
     if args.use_cuda:
       target = target.cuda(async=True)
       input = input.cuda()
+      
     input_var = torch.autograd.Variable(input)
     target_var = torch.autograd.Variable(target)
 
@@ -239,6 +242,11 @@ def train(train_loader, model, criterion, optimizer, epoch, log, train_dataset):
     #import ipdb; ipdb.set_trace()
     loss = criterion(output, target_var)
 
+    entropy_val = 0
+    perplexity_val = 0
+    for batch_output in output:
+      entropy_val += get_entropy(softmax(batch_output.data.numpy()))
+      perplexity_val += get_perplexity(entropy_val)
 
     # measure accuracy and record loss
     #prec1, prec5 = accuracy(output.data, target, topk=(1, 5))
@@ -246,9 +254,16 @@ def train(train_loader, model, criterion, optimizer, epoch, log, train_dataset):
     losses.update(loss.data[0], input.size(0))
     top1.update(prec1[0], input.size(0))
     top5.update(prec5[0], input.size(0))
-    writer.add_scalar('Cross Entropy Loss', loss.data[0], i)
-    writer.add_scalar('Precision 1', prec1[0], i)
-    writer.add_scalar('Precision 5', prec5[0], i)
+    writer.add_scalar('Training Loss', loss.data[0], i)
+    writer.add_scalar('Accuracy Top 1', prec1[0], i)
+    writer.add_scalar('Accuracy Top 5', prec5[0], i)
+    writer.add_scalar('Entropy', entropy_val, i)
+    writer.add_scalar('Perplexity', perplexity_val, i)
+
+    if i == 0:
+      for input_index in range(len(input)):
+        writer.add_audio("First Audio Per Epoch Sample " + str(input_index),
+                                     input[input_index], sample_rate=16000)
 
     # compute gradient and do SGD step
     optimizer.zero_grad()
@@ -290,6 +305,7 @@ def validate(val_loader, model, criterion, log, val_dataset):
     if args.use_cuda:
       target = target.cuda(async=True)
       input = input.cuda()
+
     input_var = torch.autograd.Variable(input, volatile=True)
     target_var = torch.autograd.Variable(target, volatile=True)
 
@@ -301,8 +317,11 @@ def validate(val_loader, model, criterion, log, val_dataset):
     # measure accuracy and record loss
     prec1, prec5 = accuracy(output.data, target, topk=(1, 2))
     losses.update(loss.data[0], input.size(0))
+    writer.add_scalar('Validation Loss', loss.data[0], i)
     top1.update(prec1[0], input.size(0))
     top5.update(prec5[0], input.size(0))
+    writer.add_scalar('Validation Accuracy Top 1', prec1[0], i)
+    writer.add_scalar('Validation Accuracy Top 5', prec5[0], i)
 
   print_log('  **Test** Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f} Error@1 {error1:.3f}'.format(top1=top1, top5=top5, error1=100-top1.avg), log)
 
@@ -378,6 +397,15 @@ def accuracy(output, target, topk=(1,)):
     correct_k = correct[:k].view(-1).float().sum(0)
     res.append(correct_k.mul_(100.0 / batch_size))
   return res
+
+def get_entropy(label_probs):
+  return -sum([((i+1e-10) * log((i+1e-10), 2)) for i in label_probs])
+
+def get_perplexity(entropy):
+  return exp(entropy)
+
+def softmax(x):
+    return np.exp(x+1e-10) / np.sum(np.exp(x+1e-10), axis=0)
 
 if __name__ == '__main__':
   main()
