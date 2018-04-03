@@ -24,7 +24,7 @@ writer = SummaryWriter()
 
 parser = argparse.ArgumentParser(description='Trains AlexNet on CMU Arctic', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('data_path', type=str, default='data', help='Path to dataset')
-parser.add_argument('--dataset', type=str, default='yesno', choices=['arctic', 'vctk', 'yesno'])
+parser.add_argument('--dataset', type=str, default='arctic', choices=['arctic', 'vctk', 'yesno'])
 parser.add_argument('--arch', metavar='ARCH', default='alexnet', choices=model_names, help='model architecture: ' + ' | '.join(model_names) + ' (default: alexnet)')
 # Optimization options
 parser.add_argument('--epochs', type=int, default=300, help='Number of epochs to train.')
@@ -91,11 +91,7 @@ def main():
     # TODO No ImageFolder equivalent for audio. Need to create a Dataset manually
     train_dataset = Arctic(train_dir, transform=transforms_audio, download=True)
     val_dataset = Arctic(val_dir, transform=transforms_audio, download=True)
-<<<<<<< HEAD
-    num_classes = 2
-=======
     num_classes = 4
->>>>>>> b928b912b29db89f27abdea5e4b252b80cc94b40
   elif args.dataset == 'vctk':
     train_dataset = dset.VCTK(train_dir, transform=transforms_audio, download=True)
     val_dataset = dset.VCTK(val_dir, transform=transforms_audio, download=True)
