@@ -23,7 +23,7 @@ model_names = ['alexnet']
 writer = SummaryWriter()
 
 parser = argparse.ArgumentParser(description='Trains AlexNet on CMU Arctic', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument('data_path', type=str, default='data', help='Path to dataset')
+parser.add_argument('--data_path', type=str, default='data', help='Path to dataset')
 parser.add_argument('--dataset', type=str, default='arctic', choices=['arctic', 'vctk', 'yesno'])
 parser.add_argument('--arch', metavar='ARCH', default='alexnet', choices=model_names, help='model architecture: ' + ' | '.join(model_names) + ' (default: alexnet)')
 # Optimization options
