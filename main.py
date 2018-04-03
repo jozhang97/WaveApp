@@ -259,9 +259,9 @@ def train(train_loader, model, criterion, optimizer, epoch, log, train_dataset):
     writer.add_scalar('Perplexity', perplexity_val, i)
 
     if i == 0:
-      for i in range(len(input)):
-        writer.add_audio("First Audio Per Epoch Sample " + str(i),
-                                     input[i], sample_rate=16000)
+      for input_index in range(len(input)):
+        writer.add_audio("First Audio Per Epoch Sample " + str(input_index),
+                                     input[input_index], sample_rate=16000)
 
     # compute gradient and do SGD step
     optimizer.zero_grad()
@@ -397,13 +397,13 @@ def accuracy(output, target, topk=(1,)):
   return res
 
 def get_entropy(label_probs):
-  return -sum([(i * log(i, 2)) for i in label_probs])
+  return -sum([((i+1e-10) * log((i+1e-10), 2)) for i in label_probs])
 
 def get_perplexity(entropy):
   return exp(entropy)
 
 def softmax(x):
-    return np.exp(x) / np.sum(np.exp(x), axis=0)
+    return np.exp(x+1e-10) / np.sum(np.exp(x+1e-10), axis=0)
 
 if __name__ == '__main__':
   main()
