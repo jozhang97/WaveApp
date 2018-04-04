@@ -30,7 +30,7 @@ parser.add_argument('--dataset', type=str, default='arctic', choices=['arctic', 
 parser.add_argument('--arch', metavar='ARCH', default='alexnet', choices=model_names, help='model architecture: ' + ' | '.join(model_names) + ' (default: alexnet)')
 # Optimization options
 parser.add_argument('--epochs', type=int, default=300, help='Number of epochs to train.')
-parser.add_argument('--batch_size', type=int, default=10, help='Batch size.')
+parser.add_argument('--batch_size', type=int, default=64, help='Batch size.')
 parser.add_argument('--learning_rate', type=float, default=0.1, help='The Learning Rate.')
 parser.add_argument('--momentum', type=float, default=0.9, help='Momentum.')
 parser.add_argument('--decay', type=float, default=0.0005, help='Weight decay (L2 penalty).')
@@ -43,7 +43,7 @@ parser.add_argument('--resume', default='./logs', type=str, metavar='PATH', help
 parser.add_argument('--start_epoch', default=0, type=int, metavar='N', help='manual epoch number (useful on restarts)')
 parser.add_argument('--evaluate', dest='evaluate', action='store_true', help='evaluate model on validation set')
 # Acceleration
-parser.add_argument('--ngpu', type=int, default=0, help='0 = CPU.')
+parser.add_argument('--ngpu', type=int, default=1, help='0 = CPU.')
 parser.add_argument('--workers', type=int, default=1, help='number of data loading workers (default: 2)')
 # random seed
 parser.add_argument('--manualSeed', type=int, help='manual seed')
@@ -158,7 +158,7 @@ def main():
     print_log("=> do not use any checkpoint for {} model".format(args.arch), log)
 
   if args.evaluate:
-    validate(val_loader, net, criterion, log, val_dataset)
+    validate(val_loader, net, criterion, 0, log, val_dataset)
     return
 
   # Main loop
@@ -182,7 +182,7 @@ def main():
 
     # evaluate on validation set
     #val_acc,   val_los   = extract_features(test_loader, net, criterion, log)
-    val_acc,   val_los   = validate(val_loader, net, criterion, log, val_dataset)
+    val_acc,   val_los   = validate(val_loader, net, criterion, epoch, log, val_dataset)
     is_best = recorder.update(epoch, train_los, train_acc, val_los, val_acc)
 
     save_checkpoint({
@@ -215,7 +215,6 @@ def train(train_loader, model, criterion, optimizer, epoch, log, train_dataset):
     # TODO Do this in dataset specific file, this is just to get it to run.
     #target = np.array([0, 1, 1, 1, 1, 1, 1, 0, 0, 0])  # Just for debugging yesno
 
-    #import ipdb; ipdb.set_trace()
     input = train_dataset.preprocess_input(input)
     target = train_dataset.preprocess_input(target)
     target = target.type(torch.LongTensor)
@@ -239,7 +238,6 @@ def train(train_loader, model, criterion, optimizer, epoch, log, train_dataset):
     # compute output
     output = model(input_var)
     output = train_dataset.postprocess_target(output)
-    #import ipdb; ipdb.set_trace()
     loss = criterion(output, target_var)
 
     entropy_val = 0
@@ -254,16 +252,17 @@ def train(train_loader, model, criterion, optimizer, epoch, log, train_dataset):
     losses.update(loss.data[0], input.size(0))
     top1.update(prec1[0], input.size(0))
     top5.update(prec5[0], input.size(0))
-    writer.add_scalar('Training Loss', loss.data[0], i)
-    writer.add_scalar('Accuracy Top 1', prec1[0], i)
-    writer.add_scalar('Accuracy Top 5', prec5[0], i)
-    writer.add_scalar('Entropy', entropy_val, i)
-    writer.add_scalar('Perplexity', perplexity_val, i)
 
     if i == 0:
+      writer.add_scalar('Training Loss', loss.data[0], epoch)
+      writer.add_scalar('Accuracy Top 1', prec1[0], epoch)
+      writer.add_scalar('Accuracy Top 5', prec5[0], epoch)
+      writer.add_scalar('Entropy', entropy_val, epoch)
+      writer.add_scalar('Perplexity', perplexity_val, epoch)
       for input_index in range(len(input)):
-        writer.add_audio("First Audio Per Epoch Sample " + str(input_index),
-                                     input[input_index], sample_rate=16000)
+        audio = input[input_index][0]
+        writer.add_audio("Training: Epoch" + str(epoch) + " batch number " + str(input_index),
+                                     audio, sample_rate=16000)
 
     # compute gradient and do SGD step
     optimizer.zero_grad()
@@ -275,7 +274,6 @@ def train(train_loader, model, criterion, optimizer, epoch, log, train_dataset):
     end = time.time()
 
     if i % args.print_freq == 0:
-      #import ipdb; ipdb.set_trace()
       print_log('  Epoch: [{:03d}][{:03d}/{:03d}]   '
             'Time {batch_time.val:.3f} ({batch_time.avg:.3f})   '
             'Data {data_time.val:.3f} ({data_time.avg:.3f})   '
@@ -287,7 +285,7 @@ def train(train_loader, model, criterion, optimizer, epoch, log, train_dataset):
   print_log('  **Train** Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f} Error@1 {error1:.3f}'.format(top1=top1, top5=top5, error1=100-top1.avg), log)
   return top1.avg, losses.avg
 
-def validate(val_loader, model, criterion, log, val_dataset):
+def validate(val_loader, model, criterion, epoch, log, val_dataset):
   losses = AverageMeter()
   top1 = AverageMeter()
   top5 = AverageMeter()
@@ -317,11 +315,16 @@ def validate(val_loader, model, criterion, log, val_dataset):
     # measure accuracy and record loss
     prec1, prec5 = accuracy(output.data, target, topk=(1, 2))
     losses.update(loss.data[0], input.size(0))
-    writer.add_scalar('Validation Loss', loss.data[0], i)
     top1.update(prec1[0], input.size(0))
     top5.update(prec5[0], input.size(0))
-    writer.add_scalar('Validation Accuracy Top 1', prec1[0], i)
-    writer.add_scalar('Validation Accuracy Top 5', prec5[0], i)
+    if i == 0:
+      writer.add_scalar('Validation Loss', loss.data[0], epoch)
+      writer.add_scalar('Validation Accuracy Top 1', prec1[0], epoch)
+      writer.add_scalar('Validation Accuracy Top 5', prec5[0], epoch)
+      for input_index in range(len(input)):
+        audio = input[input_index][0]
+        writer.add_audio("Validation: Epoch" + str(epoch) + " batch number " + str(input_index),
+                                     audio, sample_rate=16000)
 
   print_log('  **Test** Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f} Error@1 {error1:.3f}'.format(top1=top1, top5=top5, error1=100-top1.avg), log)
 
