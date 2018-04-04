@@ -261,10 +261,9 @@ def train(train_loader, model, criterion, optimizer, epoch, log, train_dataset):
       writer.add_scalar('Accuracy Top 5', prec5[0], epoch)
       writer.add_scalar('Entropy', entropy_val, epoch)
       writer.add_scalar('Perplexity', perplexity_val, epoch)
-      import ipdb; ipdb.set_trace(context=21)
       for input_index in range(len(input)):
-        writer.add_audio("First Audio Per Epoch Sample " + str(input_index),
-                                     input[input_index], sample_rate=16000)
+        writer.add_audio("Training: First Audio Per Epoch Sample " + str(input_index),
+                                     input[input_index][0], sample_rate=16000)
 
     # compute gradient and do SGD step
     optimizer.zero_grad()
@@ -324,6 +323,9 @@ def validate(val_loader, model, criterion, epoch, log, val_dataset):
       writer.add_scalar('Validation Loss', loss.data[0], epoch)
       writer.add_scalar('Validation Accuracy Top 1', prec1[0], epoch)
       writer.add_scalar('Validation Accuracy Top 5', prec5[0], epoch)
+      for input_index in range(len(input)):
+        writer.add_audio("Validation: First Audio Per Epoch Sample " + str(input_index),
+                                     input[input_index][0], sample_rate=16000)
 
   print_log('  **Test** Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f} Error@1 {error1:.3f}'.format(top1=top1, top5=top5, error1=100-top1.avg), log)
 
