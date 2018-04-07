@@ -20,7 +20,7 @@ class AlexNet(nn.Module):
     super(AlexNet, self).__init__()
 
     self.features = nn.Sequential(
-      nn.Conv1d(1, 96, 11, stride=4, padding=0, dilation=2),
+      nn.Conv1d(1, 96, kernel_size=11, stride=4, padding=0, dilation=2),
       nn.ReLU(inplace=True),
       nn.MaxPool1d(kernel_size=3, stride=2),
       nn.Conv1d(96, 256, kernel_size=5, stride=2, padding=2, groups=2, dilation=4),
