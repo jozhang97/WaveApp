@@ -140,11 +140,10 @@ class ResNet(nn.Module):
 
         return x
 
-
 def resnet(pretrained=False, **kwargs):
-      model = ResNet(block=BasicBlock, layer_sizes=[2,2,2,2], **kwargs)
-      if pretrained:
-        model_path = './logs'
-        pretrained_model = torch.load(model_path)
-        model.load_state_dict(pretrained_model['state_dict'])
-      return model
+    model = ResNet(block=BasicBlock, layer_sizes=[2,2,2,2], **kwargs)
+    if pretrained:
+      model_path = './logs'
+      pretrained_model = torch.load(model_path)
+      model.load_state_dict(pretrained_model['state_dict'])
+    return model
