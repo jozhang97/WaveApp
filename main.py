@@ -13,6 +13,7 @@ from models.alexnet import AlexNet
 from tensorboardX import SummaryWriter
 from scipy.stats import entropy
 from math import log, exp
+from models.mininet import MiniNet
 
 import numpy as np
 
@@ -79,8 +80,9 @@ def main():
   scale = transforms.Scale()
   padtrim = transforms.PadTrim(sample_length)
   downmix = transforms.DownmixMono()
+  mel = transforms.MEL()
   transforms_audio = transforms.Compose([
-    scale, padtrim, downmix
+    scale, padtrim, downmix, mel
   ])
 
   if not os.path.isdir(args.data_path):
@@ -123,7 +125,7 @@ def main():
   print_log("=> creating model '{}'".format(args.arch), log)
   # Init model, criterion, and optimizer
   # net = models.__dict__[args.arch](num_classes)
-  net = AlexNet(num_classes)
+  net = MiniNet(num_classes)
   #
   print_log("=> network :\n {}".format(net), log)
 
@@ -212,6 +214,8 @@ def train(train_loader, model, criterion, optimizer, epoch, log, train_dataset):
 
   end = time.time()
   for i, (input, target) in enumerate(train_loader):
+     
+    # TODO Do this in dataset specific file, this is just to get it to run.
     # TODO Do this in dataset specific file, this is just to get it to run.
     #target = np.array([0, 1, 1, 1, 1, 1, 1, 0, 0, 0])  # Just for debugging yesno
 
@@ -223,7 +227,7 @@ def train(train_loader, model, criterion, optimizer, epoch, log, train_dataset):
     except RuntimeError:
       pass
 
-    input = input.view(input.size(0), 1, input.size(1))  # Flip channels and length
+    input = input.view(-1, 2560)
 
     # measure data loading time
     data_time.update(time.time() - end)
@@ -236,6 +240,7 @@ def train(train_loader, model, criterion, optimizer, epoch, log, train_dataset):
     target_var = torch.autograd.Variable(target)
 
     # compute output
+    import ipdb; ipdb.set_trace(context=21)
     output = model(input_var)
     output = train_dataset.postprocess_target(output)
     loss = criterion(output, target_var)
@@ -259,10 +264,12 @@ def train(train_loader, model, criterion, optimizer, epoch, log, train_dataset):
       writer.add_scalar('Accuracy Top 5', prec5[0], epoch)
       writer.add_scalar('Entropy', entropy_val, epoch)
       writer.add_scalar('Perplexity', perplexity_val, epoch)
+      """
       for input_index in range(len(input)):
         audio = input[input_index][0]
         writer.add_audio("Training: Epoch" + str(epoch) + " batch number " + str(input_index),
                                      audio, sample_rate=16000)
+      """
 
     # compute gradient and do SGD step
     optimizer.zero_grad()
@@ -298,7 +305,8 @@ def validate(val_loader, model, criterion, epoch, log, val_dataset):
     target = val_dataset.preprocess_input(target)
     target = target.type(torch.LongTensor)
 
-    input = input.view(input.size(0), 1, input.size(1))  # Flip channels and leng
+
+    input = input.view(-1,2560)  # Flip channels and leng
 
     if args.use_cuda:
       target = target.cuda(async=True)
@@ -321,14 +329,14 @@ def validate(val_loader, model, criterion, epoch, log, val_dataset):
       writer.add_scalar('Validation Loss', loss.data[0], epoch)
       writer.add_scalar('Validation Accuracy Top 1', prec1[0], epoch)
       writer.add_scalar('Validation Accuracy Top 5', prec5[0], epoch)
-      for input_index in range(len(input)):
+  print_log('  **Test** Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f} Error@1 {error1:.3f}'.format(top1=top1, top5=top5, error1=100-top1.avg), log)
+  return top1.avg, losses.avg
+"""      
+    for input_index in range(len(input)):
         audio = input[input_index][0]
         writer.add_audio("Validation: Epoch" + str(epoch) + " batch number " + str(input_index),
                                      audio, sample_rate=16000)
-
-  print_log('  **Test** Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f} Error@1 {error1:.3f}'.format(top1=top1, top5=top5, error1=100-top1.avg), log)
-
-  return top1.avg, losses.avg
+"""
 
 def extract_features(val_loader, model, criterion, log):
   losses = AverageMeter()
