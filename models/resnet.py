@@ -31,18 +31,18 @@ class SimpleBlock(nn.Module):
         self.stride = stride
 
 
-      def forward(self, x):
-          residual = x
+    def forward(self, x):
+        residual = x
 
-          x = self.conv_layers(x)
+        x = self.conv_layers(x)
 
-          if self.downsample not None:
+        if self.downsample is not None:
             residual = self.downsample(residual)
 
-          x += residual
-          x = self.relu(x)
+        x += residual
+        x = self.relu(x)
 
-          return x
+        return x
 
 
 
