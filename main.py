@@ -6,11 +6,14 @@ import torch
 import torch.backends.cudnn as cudnn
 import torchaudio.datasets as dset
 import torchaudio.transforms as transforms
+from data.arctic import Arctic
 from utils import AverageMeter, RecorderMeter, time_string, convert_secs2time
 import models
 from models.alexnet import AlexNet
 from models.resnet import ResNet
 from tensorboardX import SummaryWriter
+from scipy.stats import entropy
+from math import log, exp
 
 import numpy as np
 
@@ -24,12 +27,12 @@ print(model_names)
 writer = SummaryWriter()
 
 parser = argparse.ArgumentParser(description='Trains AlexNet on CMU Arctic', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument('data_path', type=str, default='data', help='Path to dataset')
-parser.add_argument('--dataset', type=str, default='yesno', choices=['arctic', 'vctk', 'yesno'])
+parser.add_argument('--data_path', type=str, default='data', help='Path to dataset')
+parser.add_argument('--dataset', type=str, default='arctic', choices=['arctic', 'vctk', 'yesno'])
 parser.add_argument('--arch', metavar='ARCH', default='alexnet', choices=model_names, help='model architecture: ' + ' | '.join(model_names) + ' (default: alexnet)')
 # Optimization options
 parser.add_argument('--epochs', type=int, default=300, help='Number of epochs to train.')
-parser.add_argument('--batch_size', type=int, default=10, help='Batch size.')
+parser.add_argument('--batch_size', type=int, default=64, help='Batch size.')
 parser.add_argument('--learning_rate', type=float, default=0.1, help='The Learning Rate.')
 parser.add_argument('--momentum', type=float, default=0.9, help='Momentum.')
 parser.add_argument('--decay', type=float, default=0.0005, help='Weight decay (L2 penalty).')
@@ -42,7 +45,7 @@ parser.add_argument('--resume', default=None, type=str, metavar='PATH', help='pa
 parser.add_argument('--start_epoch', default=0, type=int, metavar='N', help='manual epoch number (useful on restarts)')
 parser.add_argument('--evaluate', dest='evaluate', action='store_true', help='evaluate model on validation set')
 # Acceleration
-parser.add_argument('--ngpu', type=int, default=0, help='0 = CPU.')
+parser.add_argument('--ngpu', type=int, default=1, help='0 = CPU.')
 parser.add_argument('--workers', type=int, default=1, help='number of data loading workers (default: 2)')
 # random seed
 parser.add_argument('--manualSeed', type=int, help='manual seed')
@@ -92,9 +95,9 @@ def main():
   #Choose dataset to use
   if args.dataset == 'arctic':
     # TODO No ImageFolder equivalent for audio. Need to create a Dataset manually
-    train_dataset = dset.ImageFolder(train_dir, transforms_audio)
-    val_dataset = dset.ImageFolder(val_dir, transforms_audio)
-    num_classes = 2
+    train_dataset = Arctic(train_dir, transform=transforms_audio, download=True)
+    val_dataset = Arctic(val_dir, transform=transforms_audio, download=True)
+    num_classes = 4
   elif args.dataset == 'vctk':
     train_dataset = dset.VCTK(train_dir, transform=transforms_audio, download=True)
     val_dataset = dset.VCTK(val_dir, transform=transforms_audio, download=True)
@@ -119,12 +122,14 @@ def main():
     batch_size=args.batch_size, shuffle=False,
     num_workers=args.workers, pin_memory=True)
 
+
   #Feed in respective model file to pass into model (alexnet.py)
   print_log("=> creating model '{}'".format(args.arch), log)
   # Init model, criterion, and optimizer
   m = getattr(models.__dict__[args.arch], args.arch)
   net = m(num_classes=num_classes, pretrained=args.resume)
 
+  # net = models.__dict__[args.arch](num_classes)
   print_log("=> network :\n {}".format(net), log)
 
   # net = torch.nn.DataParallel(net, device_ids=list(range(args.ngpu)))
@@ -158,7 +163,7 @@ def main():
     print_log("=> do not use any checkpoint for {} model".format(args.arch), log)
 
   if args.evaluate:
-    validate(val_loader, net, criterion, log)
+    validate(val_loader, net, criterion, 0, log, val_dataset)
     return
 
   # Main loop
@@ -178,11 +183,11 @@ def main():
     print("One epoch")
     # train for one epoch
     # Call to train (note that our previous net is passed into the model argument)
-    train_acc, train_los = train(train_loader, net, criterion, optimizer, epoch, log)
+    train_acc, train_los = train(train_loader, net, criterion, optimizer, epoch, log, train_dataset)
 
     # evaluate on validation set
     #val_acc,   val_los   = extract_features(test_loader, net, criterion, log)
-    val_acc,   val_los   = validate(val_loader, net, criterion, log)
+    val_acc,   val_los   = validate(val_loader, net, criterion, epoch, log, val_dataset)
     is_best = recorder.update(epoch, train_los, train_acc, val_los, val_acc)
 
     save_checkpoint({
@@ -201,7 +206,7 @@ def main():
   log.close()
 
 # train function (forward, backward, update)
-def train(train_loader, model, criterion, optimizer, epoch, log):
+def train(train_loader, model, criterion, optimizer, epoch, log, train_dataset):
   batch_time = AverageMeter()
   data_time = AverageMeter()
   losses = AverageMeter()
@@ -213,8 +218,16 @@ def train(train_loader, model, criterion, optimizer, epoch, log):
   end = time.time()
   for i, (input, target) in enumerate(train_loader):
     # TODO Do this in dataset specific file, this is just to get it to run.
-    target = np.array([0, 1, 1, 1, 1, 1, 1, 0, 0, 0])  # Just for debugging yesno
-    target = torch.from_numpy(target)
+    #target = np.array([0, 1, 1, 1, 1, 1, 1, 0, 0, 0])  # Just for debugging yesno
+
+    input = train_dataset.preprocess_input(input)
+    target = train_dataset.preprocess_input(target)
+    target = target.type(torch.LongTensor)
+    try:
+      target = torch.from_numpy(target)
+    except RuntimeError:
+      pass
+
     input = input.view(input.size(0), 1, input.size(1))  # Flip channels and length
 
     # measure data loading time
@@ -223,12 +236,20 @@ def train(train_loader, model, criterion, optimizer, epoch, log):
     if args.use_cuda:
       target = target.cuda(async=True)
       input = input.cuda()
+      
     input_var = torch.autograd.Variable(input)
     target_var = torch.autograd.Variable(target)
 
     # compute output
     output = model(input_var)
+    output = train_dataset.postprocess_target(output)
     loss = criterion(output, target_var)
+
+    entropy_val = 0
+    perplexity_val = 0
+    for batch_output in output:
+      entropy_val += get_entropy(softmax(batch_output.data.cpu().numpy()))
+      perplexity_val += get_perplexity(entropy_val)
 
     # measure accuracy and record loss
     #prec1, prec5 = accuracy(output.data, target, topk=(1, 5))
@@ -236,9 +257,17 @@ def train(train_loader, model, criterion, optimizer, epoch, log):
     losses.update(loss.data[0], input.size(0))
     top1.update(prec1[0], input.size(0))
     top5.update(prec5[0], input.size(0))
-    writer.add_scalar('Cross Entropy Loss', loss.data[0], i)
-    writer.add_scalar('Precision 1', prec1[0], i)
-    writer.add_scalar('Precision 5', prec5[0], i)
+
+    if i == 0:
+      writer.add_scalar('Training Loss', loss.data[0], epoch)
+      writer.add_scalar('Accuracy Top 1', prec1[0], epoch)
+      writer.add_scalar('Accuracy Top 5', prec5[0], epoch)
+      writer.add_scalar('Entropy', entropy_val, epoch)
+      writer.add_scalar('Perplexity', perplexity_val, epoch)
+      for input_index in range(len(input)):
+        audio = input[input_index][0]
+        writer.add_audio("Training: Epoch" + str(epoch) + " batch number " + str(input_index),
+                                     audio, sample_rate=16000)
 
     # compute gradient and do SGD step
     optimizer.zero_grad()
@@ -261,7 +290,7 @@ def train(train_loader, model, criterion, optimizer, epoch, log):
   print_log('  **Train** Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f} Error@1 {error1:.3f}'.format(top1=top1, top5=top5, error1=100-top1.avg), log)
   return top1.avg, losses.avg
 
-def validate(val_loader, model, criterion, log):
+def validate(val_loader, model, criterion, epoch, log, val_dataset):
   losses = AverageMeter()
   top1 = AverageMeter()
   top5 = AverageMeter()
@@ -270,21 +299,37 @@ def validate(val_loader, model, criterion, log):
   model.eval()
 
   for i, (input, target) in enumerate(val_loader):
+    input = val_dataset.preprocess_input(input)
+    target = val_dataset.preprocess_input(target)
+    target = target.type(torch.LongTensor)
+
+    input = input.view(input.size(0), 1, input.size(1))  # Flip channels and leng
+
     if args.use_cuda:
       target = target.cuda(async=True)
       input = input.cuda()
+
     input_var = torch.autograd.Variable(input, volatile=True)
     target_var = torch.autograd.Variable(target, volatile=True)
 
     # compute output
     output = model(input_var)
+    ouptut = val_dataset.postprocess_target(output)
     loss = criterion(output, target_var)
 
     # measure accuracy and record loss
-    prec1, prec5 = accuracy(output.data, target, topk=(1, 5))
+    prec1, prec5 = accuracy(output.data, target, topk=(1, 2))
     losses.update(loss.data[0], input.size(0))
     top1.update(prec1[0], input.size(0))
     top5.update(prec5[0], input.size(0))
+    if i == 0:
+      writer.add_scalar('Validation Loss', loss.data[0], epoch)
+      writer.add_scalar('Validation Accuracy Top 1', prec1[0], epoch)
+      writer.add_scalar('Validation Accuracy Top 5', prec5[0], epoch)
+      for input_index in range(len(input)):
+        audio = input[input_index][0]
+        writer.add_audio("Validation: Epoch" + str(epoch) + " batch number " + str(input_index),
+                                     audio, sample_rate=16000)
 
   print_log('  **Test** Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f} Error@1 {error1:.3f}'.format(top1=top1, top5=top5, error1=100-top1.avg), log)
 
@@ -308,12 +353,11 @@ def extract_features(val_loader, model, criterion, log):
     # compute output
     output, features = model([input_var])
 
-    pdb.set_trace()
 
     loss = criterion(output, target_var)
 
     # measure accuracy and record loss
-    prec1, prec5 = accuracy(output.data, target, topk=(1, 5))
+    prec1, prec5 = accuracy(output.data, target, topk=(1, 2))
     losses.update(loss.data[0], input.size(0))
     top1.update(prec1[0], input.size(0))
     top5.update(prec5[0], input.size(0))
@@ -361,6 +405,15 @@ def accuracy(output, target, topk=(1,)):
     correct_k = correct[:k].view(-1).float().sum(0)
     res.append(correct_k.mul_(100.0 / batch_size))
   return res
+
+def get_entropy(label_probs):
+  return -sum([((i+1e-10) * log((i+1e-10), 2)) for i in label_probs])
+
+def get_perplexity(entropy):
+  return np.exp(entropy)
+
+def softmax(x):
+    return np.exp(x+1e-10) / np.sum(np.exp(x+1e-10), axis=0)
 
 if __name__ == '__main__':
   main()
