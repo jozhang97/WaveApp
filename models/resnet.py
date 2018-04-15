@@ -18,27 +18,35 @@ class SimpleBlock(nn.Module):
     """
     expansion_factor = 1
     def __init__(self, in_channels, out_channels, stride=1, downsample=None):
-        super(BasicBlock, self).__init__()
+        super(SimpleBlock, self).__init__()
         self.conv1 = conv3x3(in_channels, out_channels, stride)
         # add batch norm in between?
         self.relu = nn.ReLU(inplace=True)
-        self.conv2 = conv3x3(in_channels, out_channels, stride)
+        self.conv2 = conv3x3(out_channels, out_channels, stride)
         # add batch norm again?
 
         self.conv_layers = nn.Sequential(self.conv1, self.relu, self.conv2)
 
         self.downsample = downsample
-        self.stride = stride
 
 
     def forward(self, x):
+#        import ipdb; ipdb.set_trace(context=21)
         residual = x
 
         x = self.conv_layers(x)
-
         if self.downsample is not None:
+#           print('downsample is not none')
             residual = self.downsample(residual)
-
+#       print(len(residual), " and x length", len(x))
+        if x.shape[2] != residual.shape[2]:
+            N, C, L = residual.shape
+            residual = residual.view(L, C, N)
+            L_x = x.shape[2]
+            start = int( (L-L_x) / 2)
+            end = start + L_x
+            residual = residual[start:end]
+            residual = residual.view(N, C, end - start)
         x += residual
         x = self.relu(x)
 
@@ -59,14 +67,14 @@ class ResNet(nn.Module):
         """
 
         # initial 7x7 conv layer
-        self.conv1 = nn.Conv1d(1, 96, kernel_size=7, stride=2, padding=3, bias=False)
+        self.conv1 = nn.Conv1d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
         self.relu = nn.ReLU(inplace=True)
         # have an initial max/avg pool 
 
         self.layer1 = self.generate_layer(block, 64, layer_sizes[0])
         self.layer2 = self.generate_layer(block, 128, layer_sizes[1], stride=2)
         self.layer3 = self.generate_layer(block, 256, layer_sizes[2], stride=2)
-
+#self.layer3 = self.generate_layer(block, 256, layer_sizes[2], stride=2)
         # CAN CHANGE PARAMETERS FOR EACH Conv1D/ReLU LAYER
 
         # figure out what is the groups parameter in nn.Conv1D
@@ -80,7 +88,7 @@ class ResNet(nn.Module):
 
         # self.blocks = [block1, block2, block3, block4, block5, block6]
 
-        self.latent_vector_size = 256 * 27 # change this potentially
+        self.latent_vector_size = 80128 # change this potentially
 
         self.classifier = nn.Sequential(
           nn.Linear(self.latent_vector_size, 4096),
@@ -126,6 +134,7 @@ class ResNet(nn.Module):
 
 
     def forward(self, x):
+#        import ipdb; ipdb.set_trace(context=21)
         x = self.conv1(x)
         x = self.relu(x)
         # max/avg pool
@@ -136,12 +145,13 @@ class ResNet(nn.Module):
 
         # avg pool again?
         # classify layer
+        x = x.view(-1, self.latent_vector_size)
         x = self.classifier(x)
 
         return x
 
 def resnet(pretrained=False, **kwargs):
-    model = ResNet(block=BasicBlock, layer_sizes=[2,2,2,2], **kwargs)
+    model = ResNet(block=SimpleBlock, layer_sizes=[2,2,2,2], **kwargs)
     if pretrained:
       model_path = './logs'
       pretrained_model = torch.load(model_path)
