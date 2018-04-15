@@ -71,9 +71,9 @@ class ResNet(nn.Module):
         self.relu = nn.ReLU(inplace=True)
         # have an initial max/avg pool 
 
-        self.layer1 = self.generate_layer(block, 64, layer_sizes[0])
-        self.layer2 = self.generate_layer(block, 128, layer_sizes[1], stride=2)
-        self.layer3 = self.generate_layer(block, 256, layer_sizes[2], stride=2)
+        self.layer1 = self.generate_layer(block_type=block, channels=64, num_blocks=layer_sizes[0])
+        self.layer2 = self.generate_layer(block_type=block, channels=128, num_blocks=layer_sizes[1], stride=2)
+        self.layer3 = self.generate_layer(block_type=block, channels=256, num_blocks=layer_sizes[2], stride=2)
 #self.layer3 = self.generate_layer(block, 256, layer_sizes[2], stride=2)
         # CAN CHANGE PARAMETERS FOR EACH Conv1D/ReLU LAYER
 
@@ -101,9 +101,9 @@ class ResNet(nn.Module):
           nn.Softmax(dim=1)
         )
 
-    def generate_layer(self, block, channels, num_blocks, stride=1):
+    def generate_layer(self, block_type, channels, num_blocks, stride=1):
         downsample = None
-        out_channels = channels * block.expansion_factor
+        out_channels = channels * block_type.expansion_factor
         # if our stride is greater than 1 or we see the input channels is not same as output channels,
         # we need to define a downsample function in order to properly add residuals
         if stride != 1 or self.in_channels != out_channels:
@@ -111,10 +111,10 @@ class ResNet(nn.Module):
 
         blocks = []
         # add initial block (which could need downsampling)
-        blocks.append(block(self.in_channels, channels, stride, downsample))
+        blocks.append(block_type(self.in_channels, channels, stride, downsample))
         self.in_channels = out_channels
         for i in range(1, num_blocks):
-            blocks.append(block(self.in_channels, channels))
+            blocks.append(block_type(self.in_channels, channels))
 
         return nn.Sequential(*blocks)
 
