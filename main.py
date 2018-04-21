@@ -29,7 +29,7 @@ parser.add_argument('--data_path', type=str, default='data', help='Path to datas
 parser.add_argument('--dataset', type=str, default='arctic', choices=['arctic', 'vctk', 'yesno'])
 parser.add_argument('--arch', metavar='ARCH', default='alexnet', choices=model_names, help='model architecture: ' + ' | '.join(model_names) + ' (default: alexnet)')
 # Optimization options
-parser.add_argument('--epochs', type=int, default=300, help='Number of epochs to train.')
+parser.add_argument('--epochs', type=int, default=10000, help='Number of epochs to train.')
 parser.add_argument('--batch_size', type=int, default=64, help='Batch size.')
 parser.add_argument('--learning_rate', type=float, default=0.1, help='The Learning Rate.')
 parser.add_argument('--momentum', type=float, default=0.9, help='Momentum.')
@@ -143,10 +143,15 @@ def main():
 
   recorder = RecorderMeter(args.epochs)
   # optionally resume from a checkpoint
+  # Need same python vresion that the resume was in 
   if args.resume:
     if os.path.isfile(args.resume):
       print_log("=> loading checkpoint '{}'".format(args.resume), log)
-      checkpoint = torch.load(args.resume)
+      if args.ngpu == 0:
+        checkpoint = torch.load(args.resume, map_location=lambda storage, loc: storage)
+      else:
+        checkpoint = torch.load(args.resume)
+
       recorder = checkpoint['recorder']
       args.start_epoch = checkpoint['epoch']
       net.load_state_dict(checkpoint['state_dict'])
