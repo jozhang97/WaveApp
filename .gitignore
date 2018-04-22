@@ -2,6 +2,7 @@ data
 logs
 runs
 *.tar
+*.wav
 
 *.idea 
 # Byte-compiled / optimized / DLL files
