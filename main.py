@@ -41,7 +41,7 @@ parser.add_argument('--print_freq', default=200, type=int, metavar='N', help='pr
 parser.add_argument('--save_path', type=str, default='./logs', help='Folder to save checkpoints and log.')
 parser.add_argument('--resume', default='./logs', type=str, metavar='PATH', help='path to latest checkpoint')
 parser.add_argument('--start_epoch', default=0, type=int, metavar='N', help='manual epoch number (useful on restarts)')
-parser.add_argument('--evaluate', dest='evaluate', action='store_true', help='evaluate model on validation set')
+parser.add_argument('--evaluate',type=bool, default=False, help='evaluate model on validation set')
 # Acceleration
 parser.add_argument('--ngpu', type=int, default=1, help='0 = CPU.')
 parser.add_argument('--workers', type=int, default=1, help='number of data loading workers (default: 2)')
