@@ -1,5 +1,5 @@
 from __future__ import print_function
-from data import DataProperty
+from data.data import DataProperty
 
 import os
 import os.path
